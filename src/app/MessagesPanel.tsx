@@ -178,9 +178,6 @@ export function MessagesPanel({
                         <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
                           {message.authorLoginName}
                         </p>
-                        <p className="shrink-0 text-[11px] text-slate-400">
-                          {new Date(message.createdAt).toLocaleString()}
-                        </p>
                       </div>
                       {!isFriendsServerSelected && message.canDelete ? (
                         <button
