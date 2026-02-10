@@ -26,4 +26,11 @@ export default defineSchema({
   })
     .index('by_provider_subject', ['provider', 'providerSubject'])
     .index('by_user_id', ['userId']),
+  servers: defineTable({
+    name: v.string(),
+    ownerId: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_owner_id', ['ownerId'])
+    .index('by_created_at', ['createdAt']),
 })
