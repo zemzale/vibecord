@@ -30,11 +30,7 @@ import {
 import {
   listDirectMessageChannelsQuery,
   listDirectMessagesQuery,
-  listFriendRequestsQuery,
-  listFriendsQuery,
-  respondToFriendRequestMutation,
   sendDirectMessageMutation,
-  sendFriendRequestMutation,
 } from "./lib/friends";
 
 type AppRoute =
@@ -139,7 +135,6 @@ function App() {
   const [channelName, setChannelName] = useState("");
   const [messageContent, setMessageContent] = useState("");
   const [joinServerId, setJoinServerId] = useState("");
-  const [friendLoginName, setFriendLoginName] = useState("");
   const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(
     null,
   );
@@ -158,18 +153,11 @@ function App() {
   const [messageErrorMessage, setMessageErrorMessage] = useState<string | null>(
     null,
   );
-  const [friendErrorMessage, setFriendErrorMessage] = useState<string | null>(
-    null,
-  );
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isJoiningServer, setIsJoiningServer] = useState(false);
-  const [isSendingFriendRequest, setIsSendingFriendRequest] = useState(false);
   const [leavingServerId, setLeavingServerId] = useState<string | null>(null);
-  const [respondingFriendRequestId, setRespondingFriendRequestId] = useState<
-    string | null
-  >(null);
   const [deletingServerId, setDeletingServerId] = useState<string | null>(null);
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(
     null,
@@ -177,6 +165,7 @@ function App() {
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
     null,
   );
+  const [isServerActionsOpen, setIsServerActionsOpen] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(
     readInitialSessionToken,
   );
@@ -193,8 +182,6 @@ function App() {
   const joinServer = useMutation(joinServerMutation);
   const leaveServer = useMutation(leaveServerMutation);
   const deleteServer = useMutation(deleteServerMutation);
-  const sendFriendRequest = useMutation(sendFriendRequestMutation);
-  const respondToFriendRequest = useMutation(respondToFriendRequestMutation);
   const sendDirectMessage = useMutation(sendDirectMessageMutation);
 
   const route = useMemo(() => parseRoute(pathname), [pathname]);
@@ -244,16 +231,16 @@ function App() {
       ? { sessionToken, serverId: selectedServerId }
       : "skip",
   );
+  const selectedServerChannel = useMemo(
+    () => channels?.find((channel) => channel.id === selectedChannelId) ?? null,
+    [channels, selectedChannelId],
+  );
   const selectedDirectMessageChannel = useMemo(
     () =>
       directMessageChannels?.find(
         (channel) => channel.id === selectedChannelId,
       ) ?? null,
     [directMessageChannels, selectedChannelId],
-  );
-  const selectedServerChannel = useMemo(
-    () => channels?.find((channel) => channel.id === selectedChannelId) ?? null,
-    [channels, selectedChannelId],
   );
   const messages = useQuery(
     isFriendsServerSelected ? listDirectMessagesQuery : listMessagesQuery,
@@ -262,14 +249,6 @@ function App() {
         ? { sessionToken, friendshipId: selectedChannelId }
         : { sessionToken, channelId: selectedChannelId }
       : "skip",
-  );
-  const friendRequests = useQuery(
-    listFriendRequestsQuery,
-    activeUser && sessionToken ? { sessionToken } : "skip",
-  );
-  const friends = useQuery(
-    listFriendsQuery,
-    activeUser && sessionToken ? { sessionToken } : "skip",
   );
 
   function navigate(nextPath: string, options?: { replace?: boolean }) {
@@ -417,73 +396,8 @@ function App() {
     setChannelErrorMessage(null);
     setMessageContent("");
     setMessageErrorMessage(null);
-    setFriendLoginName("");
-    setFriendErrorMessage(null);
     window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
     navigate(LOGIN_PATH, { replace: true });
-  }
-
-  async function handleSendFriendRequest(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!sessionToken) {
-      setFriendErrorMessage("You must be logged in to send a friend request.");
-      return;
-    }
-
-    setFriendErrorMessage(null);
-    setIsSendingFriendRequest(true);
-
-    try {
-      await sendFriendRequest({
-        sessionToken,
-        loginName: friendLoginName,
-      });
-      setFriendLoginName("");
-    } catch (error) {
-      if (error instanceof ConvexError && typeof error.data === "string") {
-        setFriendErrorMessage(error.data);
-      } else {
-        setFriendErrorMessage(
-          "Unable to send this friend request right now. Please try again.",
-        );
-      }
-    } finally {
-      setIsSendingFriendRequest(false);
-    }
-  }
-
-  async function handleRespondToFriendRequest(
-    requestId: string,
-    action: "accept" | "decline",
-  ) {
-    if (!sessionToken) {
-      setFriendErrorMessage(
-        "You must be logged in to respond to friend requests.",
-      );
-      return;
-    }
-
-    setFriendErrorMessage(null);
-    setRespondingFriendRequestId(requestId);
-
-    try {
-      await respondToFriendRequest({
-        sessionToken,
-        requestId,
-        action,
-      });
-    } catch (error) {
-      if (error instanceof ConvexError && typeof error.data === "string") {
-        setFriendErrorMessage(error.data);
-      } else {
-        setFriendErrorMessage(
-          "Unable to update this friend request right now. Please try again.",
-        );
-      }
-    } finally {
-      setRespondingFriendRequestId(null);
-    }
   }
 
   async function handleRegisterSubmit(event: FormEvent<HTMLFormElement>) {
@@ -821,266 +735,51 @@ function App() {
   const isAuthPage = route.kind === "login" || route.kind === "register";
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-slate-950 text-slate-100">
       {activeUser && route.kind === "app" ? (
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 lg:grid lg:grid-cols-[20rem_22rem_minmax(0,1fr)] lg:items-start">
-          <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex min-h-screen w-full flex-col">
+          <header className="h-16 border-b border-slate-800 bg-slate-950 px-4">
+            <div className="flex h-full flex-wrap items-center justify-between gap-3">
               <div>
-                <h1 className="text-xl font-semibold tracking-tight">
+                <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/80">
                   VibeCord
-                </h1>
-                <p className="text-xs text-slate-500">
-                  Signed in as {activeUser.loginName}
                 </p>
+                <h1 className="text-xl font-semibold text-white">
+                  Signed in as {activeUser.loginName}
+                </h1>
               </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
               >
                 Logout
               </button>
             </div>
+          </header>
 
-            <form className="space-y-3" onSubmit={handleCreateServer}>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">
-                  New server name
-                </span>
-                <input
-                  type="text"
-                  name="serverName"
-                  value={serverName}
-                  onChange={(event) => setServerName(event.target.value)}
-                  required
-                  minLength={2}
-                  maxLength={64}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
-                />
-              </label>
-
-              {serverErrorMessage ? (
-                <p className="text-sm text-red-600">{serverErrorMessage}</p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={isCreatingServer}
-                className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
-              >
-                {isCreatingServer ? "Creating server..." : "Create server"}
-              </button>
-            </form>
-
-            <form className="mt-4 space-y-3" onSubmit={handleJoinServer}>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">
-                  Join server by ID
-                </span>
-                <input
-                  type="text"
-                  name="joinServerId"
-                  value={joinServerId}
-                  onChange={(event) => setJoinServerId(event.target.value)}
-                  required
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm outline-none ring-indigo-200 transition focus:ring"
-                  placeholder="Enter server ID"
-                />
-              </label>
-
-              {joinServerErrorMessage ? (
-                <p className="text-sm text-red-600">{joinServerErrorMessage}</p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={isJoiningServer}
-                className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
-              >
-                {isJoiningServer ? "Joining server..." : "Join server"}
-              </button>
-            </form>
-
-            {leaveServerErrorMessage ? (
-              <p className="mt-4 text-sm text-red-600">
-                {leaveServerErrorMessage}
-              </p>
-            ) : null}
-            {deleteServerErrorMessage ? (
-              <p className="mt-2 text-sm text-red-600">
-                {deleteServerErrorMessage}
-              </p>
-            ) : null}
-
-            <section
-              aria-label="Friends"
-              className="mt-4 space-y-3 border-t border-slate-200 pt-4"
+          <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[5.5rem_20rem_minmax(0,1fr)]">
+            <aside
+              aria-label="Servers"
+              className="relative border-b border-slate-800 bg-slate-950 p-3 lg:border-r lg:border-b-0"
             >
-              <h2 className="text-sm font-semibold text-slate-700">Friends</h2>
-              <form className="space-y-2" onSubmit={handleSendFriendRequest}>
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">
-                    Send request by login name
-                  </span>
-                  <input
-                    type="text"
-                    name="friendLoginName"
-                    value={friendLoginName}
-                    onChange={(event) => setFriendLoginName(event.target.value)}
-                    required
-                    minLength={3}
-                    maxLength={24}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
-                    placeholder="friend_login"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={isSendingFriendRequest}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  {isSendingFriendRequest
-                    ? "Sending request..."
-                    : "Send friend request"}
-                </button>
-              </form>
-
-              {friendErrorMessage ? (
-                <p className="text-sm text-red-600">{friendErrorMessage}</p>
-              ) : null}
-
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Incoming requests
-                </h3>
-                {friendRequests === undefined ? (
-                  <p className="text-sm text-slate-500">
-                    Loading friend requests...
-                  </p>
-                ) : friendRequests.incoming.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                    No incoming requests.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {friendRequests.incoming.map((request) => (
-                      <li
-                        key={request.id}
-                        className="rounded-lg border border-slate-200 bg-slate-50 p-2"
-                      >
-                        <p className="text-sm font-medium text-slate-800">
-                          {request.requesterLoginName}
-                        </p>
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void handleRespondToFriendRequest(
-                                request.id,
-                                "accept",
-                              )
-                            }
-                            disabled={respondingFriendRequestId === request.id}
-                            className="inline-flex items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
-                          >
-                            {respondingFriendRequestId === request.id
-                              ? "Saving..."
-                              : "Accept"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void handleRespondToFriendRequest(
-                                request.id,
-                                "decline",
-                              )
-                            }
-                            disabled={respondingFriendRequestId === request.id}
-                            className="inline-flex items-center rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Outgoing requests
-                </h3>
-                {friendRequests === undefined ? (
-                  <p className="text-sm text-slate-500">
-                    Loading outgoing requests...
-                  </p>
-                ) : friendRequests.outgoing.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                    No outgoing requests.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {friendRequests.outgoing.map((request) => (
-                      <li
-                        key={request.id}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                      >
-                        Waiting for {request.recipientLoginName}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Confirmed friends
-                </h3>
-                {friends === undefined ? (
-                  <p className="text-sm text-slate-500">Loading friends...</p>
-                ) : friends.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                    No friends yet.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {friends.map((friend) => (
-                      <li
-                        key={friend.id}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                      >
-                        <p className="font-medium">{friend.loginName}</p>
-                        <p className="text-xs text-slate-500">
-                          Friends since{" "}
-                          {new Date(friend.since).toLocaleDateString()}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </section>
-
-            <section aria-label="My servers" className="mt-4 space-y-2">
-              <h2 className="text-sm font-semibold text-slate-700">
-                My servers
-              </h2>
+              <p className="mb-2 hidden text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400 lg:block">
+                Servers
+              </p>
               {myServers === undefined ||
               directMessageChannels === undefined ? (
-                <p className="text-sm text-slate-500">Loading servers...</p>
+                <p className="px-2 py-3 text-xs text-slate-400">Loading...</p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
                   {appServers.map((server) => {
                     const isSelected = selectedServerId === server.id;
-                    const isFriendsServer = server.id === FRIENDS_SERVER_ID;
+                    const initials =
+                      server.id === FRIENDS_SERVER_ID
+                        ? "FR"
+                        : server.name.slice(0, 2).toUpperCase();
 
                     return (
-                      <li
-                        key={server.id}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                      >
+                      <li key={server.id}>
                         <button
                           type="button"
                           onClick={() => {
@@ -1088,57 +787,342 @@ function App() {
                             setMessageErrorMessage(null);
                             navigate(createAppPath(server.id, null));
                           }}
-                          className="w-full text-left"
+                          title={server.name}
+                          className={`relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-sm font-bold transition lg:h-14 lg:w-14 ${
+                            isSelected
+                              ? "border-cyan-300 bg-cyan-400/25 text-cyan-100 shadow-lg shadow-cyan-500/20"
+                              : "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500 hover:bg-slate-800"
+                          }`}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate font-medium">
-                                {server.name}
-                              </p>
-                              {!isFriendsServer ? (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  ID: {server.id}
-                                </p>
-                              ) : null}
-                              {isSelected ? (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Selected server
-                                </p>
-                              ) : null}
-                            </div>
-                            <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600">
-                              {isFriendsServer
-                                ? "DM"
-                                : server.membershipRole === "owner"
-                                  ? "Owner"
-                                  : "Member"}
-                            </span>
-                          </div>
+                          {initials}
                         </button>
+                      </li>
+                    );
+                  })}
 
-                        {!isFriendsServer &&
-                        server.membershipRole === "member" ? (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIsServerActionsOpen((current) => !current)
+                      }
+                      title="Create or join server"
+                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-2xl leading-none text-cyan-100 transition hover:border-cyan-300 hover:bg-slate-800 lg:h-14 lg:w-14"
+                    >
+                      +
+                    </button>
+                  </li>
+                </ul>
+              )}
+
+              {isServerActionsOpen ? (
+                <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900 p-3 lg:absolute lg:left-full lg:top-3 lg:mt-0 lg:ml-3 lg:w-72 lg:z-20">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                    Server actions
+                  </p>
+
+                  <form
+                    className="mt-3 space-y-2"
+                    onSubmit={handleCreateServer}
+                  >
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Create server
+                      </span>
+                      <input
+                        type="text"
+                        name="serverName"
+                        value={serverName}
+                        onChange={(event) => setServerName(event.target.value)}
+                        required
+                        minLength={2}
+                        maxLength={64}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                        placeholder="Studio Lounge"
+                      />
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={isCreatingServer}
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+                    >
+                      {isCreatingServer
+                        ? "Creating server..."
+                        : "Create server"}
+                    </button>
+                  </form>
+
+                  <form className="mt-4 space-y-2" onSubmit={handleJoinServer}>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Join server by ID
+                      </span>
+                      <input
+                        type="text"
+                        name="joinServerId"
+                        value={joinServerId}
+                        onChange={(event) =>
+                          setJoinServerId(event.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                        placeholder="Enter server ID"
+                      />
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={isJoiningServer}
+                      className="inline-flex w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isJoiningServer ? "Joining server..." : "Join server"}
+                    </button>
+                  </form>
+
+                  {serverErrorMessage ? (
+                    <p className="mt-3 text-sm text-rose-300">
+                      {serverErrorMessage}
+                    </p>
+                  ) : null}
+                  {joinServerErrorMessage ? (
+                    <p className="mt-2 text-sm text-rose-300">
+                      {joinServerErrorMessage}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </aside>
+
+            <section
+              aria-label="Channels"
+              className="border-b border-slate-800 bg-slate-950 p-4 lg:border-r lg:border-b-0"
+            >
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+                Channels
+              </h2>
+
+              <label className="mt-3 block">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Selected server
+                </span>
+                <select
+                  value={selectedServerId ?? ""}
+                  onChange={(event) => {
+                    setChannelErrorMessage(null);
+                    setMessageErrorMessage(null);
+                    navigate(createAppPath(event.target.value || null, null));
+                  }}
+                  disabled={!activeUser}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950"
+                >
+                  {appServers.length > 0 ? (
+                    appServers.map((server) => (
+                      <option key={server.id} value={server.id}>
+                        {server.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No servers available</option>
+                  )}
+                </select>
+              </label>
+
+              {selectedServer ? (
+                <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900/70 p-3 text-xs text-slate-300">
+                  <p className="font-semibold text-slate-100">
+                    {selectedServer.name}
+                  </p>
+                  {selectedServer.id !== FRIENDS_SERVER_ID ? (
+                    <>
+                      <p className="mt-1 font-mono text-[11px] text-slate-400">
+                        ID: {selectedServer.id}
+                      </p>
+                      <p className="mt-1 uppercase tracking-wide text-slate-400">
+                        Role:{" "}
+                        {selectedServer.membershipRole === "owner"
+                          ? "Owner"
+                          : "Member"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-1 uppercase tracking-wide text-slate-400">
+                      Role: DM
+                    </p>
+                  )}
+                  {selectedServer.id !== FRIENDS_SERVER_ID &&
+                  selectedServer.membershipRole === "member" ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleLeaveServer(selectedServer.id)}
+                      disabled={leavingServerId === selectedServer.id}
+                      className="mt-2 inline-flex items-center rounded-full border border-amber-300/40 bg-amber-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {leavingServerId === selectedServer.id
+                        ? "Leaving..."
+                        : "Leave server"}
+                    </button>
+                  ) : selectedServer.id !== FRIENDS_SERVER_ID &&
+                    selectedServer.membershipRole === "owner" ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteServer(selectedServer.id)}
+                      disabled={deletingServerId === selectedServer.id}
+                      className="mt-2 inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deletingServerId === selectedServer.id
+                        ? "Deleting..."
+                        : "Delete server"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {leaveServerErrorMessage ? (
+                <p className="mt-2 text-sm text-rose-300">
+                  {leaveServerErrorMessage}
+                </p>
+              ) : null}
+              {deleteServerErrorMessage ? (
+                <p className="mt-2 text-sm text-rose-300">
+                  {deleteServerErrorMessage}
+                </p>
+              ) : null}
+
+              <form className="mt-4 space-y-2" onSubmit={handleCreateChannel}>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Create channel
+                  </span>
+                  <input
+                    type="text"
+                    name="channelName"
+                    value={channelName}
+                    onChange={(event) => setChannelName(event.target.value)}
+                    required
+                    minLength={1}
+                    maxLength={64}
+                    disabled={!selectedServerId || isFriendsServerSelected}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950"
+                    placeholder={
+                      isFriendsServerSelected
+                        ? "Direct message channels are generated automatically"
+                        : selectedServer
+                          ? `Create in ${selectedServer.name}`
+                          : "Select a server first"
+                    }
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={
+                    isCreatingChannel ||
+                    !selectedServerId ||
+                    isFriendsServerSelected
+                  }
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isCreatingChannel ? "Creating channel..." : "Create channel"}
+                </button>
+              </form>
+
+              {channelErrorMessage ? (
+                <p className="mt-3 text-sm text-rose-300">
+                  {channelErrorMessage}
+                </p>
+              ) : null}
+
+              {!selectedServerId ? (
+                <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                  Select a server to view its channels.
+                </p>
+              ) : isFriendsServerSelected ? (
+                directMessageChannels === undefined ? (
+                  <p className="mt-3 text-sm text-slate-400">Loading DMs...</p>
+                ) : directMessageChannels.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                    Accept a friend request to start a DM channel.
+                  </p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {directMessageChannels.map((channel) => {
+                      const isSelected = selectedChannelId === channel.id;
+
+                      return (
+                        <li
+                          key={channel.id}
+                          className={`rounded-xl border px-3 py-2 text-sm transition ${
+                            isSelected
+                              ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100"
+                              : "border-slate-700 bg-slate-900 text-slate-200"
+                          }`}
+                        >
                           <button
                             type="button"
-                            onClick={() => void handleLeaveServer(server.id)}
-                            disabled={leavingServerId === server.id}
-                            className="mt-2 inline-flex items-center rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                            onClick={() => {
+                              setMessageErrorMessage(null);
+                              navigate(
+                                createAppPath(FRIENDS_SERVER_ID, channel.id),
+                              );
+                            }}
+                            className="min-w-0 w-full text-left"
                           >
-                            {leavingServerId === server.id
-                              ? "Leaving..."
-                              : "Leave server"}
+                            <p className="truncate font-medium">
+                              @ {channel.friendLoginName}
+                            </p>
                           </button>
-                        ) : !isFriendsServer &&
-                          server.membershipRole === "owner" ? (
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )
+              ) : channels === undefined ? (
+                <p className="mt-3 text-sm text-slate-400">
+                  Loading channels...
+                </p>
+              ) : channels.length === 0 ? (
+                <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                  No channels in this server yet.
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {channels.map((channel) => {
+                    const isSelected = selectedChannelId === channel.id;
+
+                    return (
+                      <li
+                        key={channel.id}
+                        className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                          isSelected
+                            ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100"
+                            : "border-slate-700 bg-slate-900 text-slate-200"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMessageErrorMessage(null);
+                            navigate(
+                              createAppPath(selectedServerId, channel.id),
+                            );
+                          }}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <p className="truncate font-medium">
+                            # {channel.name}
+                          </p>
+                        </button>
+                        {channel.canDelete ? (
                           <button
                             type="button"
-                            onClick={() => void handleDeleteServer(server.id)}
-                            disabled={deletingServerId === server.id}
-                            className="mt-2 inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
+                            onClick={() => void handleDeleteChannel(channel.id)}
+                            disabled={deletingChannelId === channel.id}
+                            className="inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {deletingServerId === server.id
+                            {deletingChannelId === channel.id
                               ? "Deleting..."
-                              : "Delete server"}
+                              : "Delete"}
                           </button>
                         ) : null}
                       </li>
@@ -1147,287 +1131,135 @@ function App() {
                 </ul>
               )}
             </section>
-          </aside>
 
-          <section
-            aria-label="Channels"
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <h2 className="text-sm font-semibold text-slate-700">Channels</h2>
+            <section
+              aria-label="Messages"
+              className="flex min-h-[26rem] flex-col bg-slate-950 p-4 lg:min-h-0"
+            >
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+                Messages
+              </h2>
 
-            <label className="mt-3 block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">
-                Selected server
-              </span>
-              <select
-                value={selectedServerId ?? ""}
-                onChange={(event) => {
-                  setChannelErrorMessage(null);
-                  setMessageErrorMessage(null);
-                  navigate(createAppPath(event.target.value || null, null));
-                }}
-                disabled={!activeUser}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
-              >
-                {appServers.length > 0 ? (
-                  appServers.map((server) => (
-                    <option key={server.id} value={server.id}>
-                      {server.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">No servers available</option>
-                )}
-              </select>
-            </label>
-
-            <form className="mt-4 space-y-3" onSubmit={handleCreateChannel}>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">
-                  New channel name
-                </span>
-                <input
-                  type="text"
-                  name="channelName"
-                  value={channelName}
-                  onChange={(event) => setChannelName(event.target.value)}
-                  required
-                  minLength={1}
-                  maxLength={64}
-                  disabled={!selectedServerId || isFriendsServerSelected}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
-                  placeholder={
-                    isFriendsServerSelected
-                      ? "Direct message channels are generated automatically"
-                      : selectedServer
-                        ? `Create in ${selectedServer.name}`
-                        : "Select a server first"
-                  }
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={
-                  isCreatingChannel ||
-                  !selectedServerId ||
-                  isFriendsServerSelected
-                }
-                className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
-              >
-                {isCreatingChannel ? "Creating channel..." : "Create channel"}
-              </button>
-            </form>
-
-            {channelErrorMessage ? (
-              <p className="mt-3 text-sm text-red-600">{channelErrorMessage}</p>
-            ) : null}
-
-            {!selectedServerId ? (
-              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                Select a server to view its channels.
-              </p>
-            ) : isFriendsServerSelected ? (
-              directMessageChannels === undefined ? (
-                <p className="mt-3 text-sm text-slate-500">Loading DMs...</p>
-              ) : directMessageChannels.length === 0 ? (
-                <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                  Accept a friend request to start a DM channel.
+              {!selectedServerId ? (
+                <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                  Select a server to start chatting.
+                </p>
+              ) : !selectedChannelId ? (
+                <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                  {isFriendsServerSelected
+                    ? "Select a DM channel to read and send messages."
+                    : "Select a channel to read and send messages."}
                 </p>
               ) : (
-                <ul className="mt-3 space-y-2">
-                  {directMessageChannels.map((channel) => (
-                    <li
-                      key={channel.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMessageErrorMessage(null);
-                          navigate(
-                            createAppPath(FRIENDS_SERVER_ID, channel.id),
-                          );
-                        }}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <p className="truncate font-medium">
-                          @ {channel.friendLoginName}
-                        </p>
-                        {selectedChannelId === channel.id ? (
-                          <p className="text-xs text-slate-500">
-                            Selected conversation
-                          </p>
-                        ) : null}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )
-            ) : channels === undefined ? (
-              <p className="mt-3 text-sm text-slate-500">Loading channels...</p>
-            ) : channels.length === 0 ? (
-              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                No channels in this server yet.
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {channels.map((channel) => (
-                  <li
-                    key={channel.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMessageErrorMessage(null);
-                        navigate(createAppPath(selectedServerId, channel.id));
-                      }}
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <p className="truncate font-medium"># {channel.name}</p>
-                      {selectedChannelId === channel.id ? (
-                        <p className="text-xs text-slate-500">
-                          Selected channel
-                        </p>
-                      ) : null}
-                    </button>
-                    {channel.canDelete ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteChannel(channel.id)}
-                        disabled={deletingChannelId === channel.id}
-                        className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
-                      >
-                        {deletingChannelId === channel.id
-                          ? "Deleting..."
-                          : "Delete"}
-                      </button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section
-            aria-label="Messages"
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <h2 className="text-sm font-semibold text-slate-700">Messages</h2>
-
-            {!selectedServerId ? (
-              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                Select a server to start chatting.
-              </p>
-            ) : !selectedChannelId ? (
-              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                {isFriendsServerSelected
-                  ? "Select a DM channel to read and send messages."
-                  : "Select a channel to read and send messages."}
-              </p>
-            ) : (
-              <>
-                <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                  {isFriendsServerSelected
-                    ? "Direct message with"
-                    : "Chatting in"}{" "}
-                  <span className="font-semibold">
+                <>
+                  <p className="mt-3 rounded-xl border border-slate-700 bg-slate-900/70 p-2 text-xs text-slate-300">
                     {isFriendsServerSelected
-                      ? (selectedDirectMessageChannel?.friendLoginName ??
-                        "Unknown friend")
-                      : `# ${selectedServerChannel?.name ?? "Unknown channel"}`}
-                  </span>
-                </p>
-
-                <form className="mt-3 space-y-3" onSubmit={handleSendMessage}>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">
-                      Message
+                      ? "Direct message with"
+                      : "Chatting in"}{" "}
+                    <span className="font-semibold text-cyan-100">
+                      {isFriendsServerSelected
+                        ? (selectedDirectMessageChannel?.friendLoginName ??
+                          "Unknown friend")
+                        : `# ${selectedServerChannel?.name ?? "Unknown channel"}`}
                     </span>
-                    <textarea
-                      name="messageContent"
-                      value={messageContent}
-                      onChange={(event) =>
-                        setMessageContent(event.target.value)
-                      }
-                      required
-                      minLength={1}
-                      maxLength={2000}
-                      rows={3}
-                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
-                      placeholder="Write a message"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    disabled={isSendingMessage}
-                    className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+                  </p>
+
+                  {messageErrorMessage ? (
+                    <p className="mt-3 text-sm text-rose-300">
+                      {messageErrorMessage}
+                    </p>
+                  ) : null}
+
+                  {messages === undefined ? (
+                    <p className="mt-3 text-sm text-slate-400">
+                      Loading messages...
+                    </p>
+                  ) : messages.length === 0 ? (
+                    <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                      No messages yet. Start the conversation.
+                    </p>
+                  ) : (
+                    <div className="mt-3 flex-1 overflow-y-auto pr-1">
+                      <ul className="space-y-2">
+                        {messages.map((message) => (
+                          <li
+                            key={message.id}
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
+                                  {message.authorLoginName}
+                                </p>
+                                <p className="shrink-0 text-[11px] text-slate-400">
+                                  {new Date(message.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                              {!isFriendsServerSelected && message.canDelete ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleDeleteMessage(message.id)
+                                  }
+                                  disabled={deletingMessageId === message.id}
+                                  className="inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {deletingMessageId === message.id
+                                    ? "Deleting..."
+                                    : "Delete"}
+                                </button>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-slate-200">
+                              {message.content}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <form
+                    className="mt-3 border-t border-slate-800 bg-slate-950 pt-3"
+                    onSubmit={handleSendMessage}
                   >
-                    {isSendingMessage ? "Sending..." : "Send message"}
-                  </button>
-                </form>
-
-                {messageErrorMessage ? (
-                  <p className="mt-3 text-sm text-red-600">
-                    {messageErrorMessage}
-                  </p>
-                ) : null}
-
-                {messages === undefined ? (
-                  <p className="mt-3 text-sm text-slate-500">
-                    Loading messages...
-                  </p>
-                ) : messages.length === 0 ? (
-                  <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                    No messages yet. Start the conversation.
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {messages.map((message) => (
-                      <li
-                        key={message.id}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
-                              {message.authorLoginName}
-                            </p>
-                            <p className="shrink-0 text-xs text-slate-500">
-                              {new Date(message.createdAt).toLocaleString()}
-                            </p>
-                          </div>
-                          {!isFriendsServerSelected && message.canDelete ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleDeleteMessage(message.id)
-                              }
-                              disabled={deletingMessageId === message.id}
-                              className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
-                            >
-                              {deletingMessageId === message.id
-                                ? "Deleting..."
-                                : "Delete"}
-                            </button>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 whitespace-pre-wrap">
-                          {message.content}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-          </section>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Message
+                      </span>
+                      <textarea
+                        name="messageContent"
+                        value={messageContent}
+                        onChange={(event) =>
+                          setMessageContent(event.target.value)
+                        }
+                        required
+                        minLength={1}
+                        maxLength={2000}
+                        rows={3}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                        placeholder="Write a message"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={isSendingMessage}
+                      className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+                    >
+                      {isSendingMessage ? "Sending..." : "Send message"}
+                    </button>
+                  </form>
+                </>
+              )}
+            </section>
+          </div>
         </div>
       ) : isAuthPage ? (
-        <section className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-semibold tracking-tight">VibeCord</h1>
-          <p className="mt-2 text-sm text-slate-600">
+        <section className="mx-auto w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/80 p-6 shadow-xl shadow-black/35 backdrop-blur">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            VibeCord
+          </h1>
+          <p className="mt-2 text-sm text-slate-300">
             {route.kind === "login"
               ? "Login to access your account."
               : "Create your account to continue."}
@@ -1439,14 +1271,14 @@ function App() {
                 key={provider.id}
                 type="button"
                 disabled
-                className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-500"
+                className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-500"
               >
                 {provider.label} (coming soon)
               </button>
             ))}
           </div>
 
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-slate-400">
             OAuth providers are planned. Use login name + password for this MVP.
           </p>
 
@@ -1457,7 +1289,7 @@ function App() {
             }
           >
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">
+              <span className="mb-1 block text-sm font-medium text-slate-300">
                 Login name
               </span>
               <input
@@ -1469,12 +1301,12 @@ function App() {
                 required
                 minLength={3}
                 maxLength={24}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
               />
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">
+              <span className="mb-1 block text-sm font-medium text-slate-300">
                 Password
               </span>
               <input
@@ -1487,18 +1319,18 @@ function App() {
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 minLength={8}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
               />
             </label>
 
             {errorMessage ? (
-              <p className="text-sm text-red-600">{errorMessage}</p>
+              <p className="text-sm text-rose-300">{errorMessage}</p>
             ) : null}
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
             >
               {isSubmitting
                 ? route.kind === "login"
@@ -1510,7 +1342,7 @@ function App() {
             </button>
           </form>
 
-          <p className="mt-4 text-sm text-slate-600">
+          <p className="mt-4 text-sm text-slate-300">
             {route.kind === "login"
               ? "Don't have an account?"
               : "Already have an account?"}{" "}
@@ -1520,7 +1352,7 @@ function App() {
                 setErrorMessage(null);
                 navigate(route.kind === "login" ? REGISTER_PATH : LOGIN_PATH);
               }}
-              className="font-medium text-slate-900 underline-offset-2 hover:underline"
+              className="font-medium text-cyan-200 underline-offset-2 hover:underline"
             >
               {route.kind === "login" ? "Register" : "Login"}
             </button>

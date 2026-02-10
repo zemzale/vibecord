@@ -328,6 +328,102 @@
       "assignee": null,
       "passes": false,
       "status": "unstarted"
+    },
+    {
+      "id": "US-021",
+      "title": "Dismiss modals on outside click",
+      "description": "As a user, I want modal dialogs to close when I click outside them so they feel natural and easy to dismiss.",
+      "acceptanceCriteria": [
+        "Clicking the overlay outside an open modal closes it",
+        "Clicking inside modal content does not close it",
+        "Keyboard and pointer interactions remain usable after dismissal",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "dependsOn": ["US-015"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-022",
+      "title": "Move sidebar actions into modals",
+      "description": "As a user, I want non-essential sidebar controls hidden behind modal actions so the shell stays focused.",
+      "acceptanceCriteria": [
+        "Remove extra chat management widgets from the visible sidebar",
+        "Expose equivalent actions through one or more modal entry points",
+        "Core navigation remains available without opening modals",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "dependsOn": ["US-015", "US-021"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-023",
+      "title": "Show message delete action on hover",
+      "description": "As a user, I want the message delete button hidden until hover so the message list feels cleaner.",
+      "acceptanceCriteria": [
+        "Delete button is hidden by default on each message row",
+        "Delete button appears on hover/focus for accessible interaction",
+        "Delete permissions still enforce existing auth rules",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "dependsOn": ["US-015"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-024",
+      "title": "Remove message timestamps from chat view",
+      "description": "As a user, I want a simpler conversation view without per-message timestamps in the message list.",
+      "acceptanceCriteria": [
+        "Message timestamps are removed from the rendered chat list",
+        "Message author and content remain clearly visible",
+        "No regression in message ordering or realtime updates",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "dependsOn": ["US-015"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-025",
+      "title": "Inline send control with icon",
+      "description": "As a user, I want the send action beside the message input with a simple icon so composing feels faster.",
+      "acceptanceCriteria": [
+        "Send control is placed inline beside the message input",
+        "Control uses a simple icon-based affordance",
+        "Submitting by button and keyboard still works",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "dependsOn": ["US-015"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-026",
+      "title": "Split up the App.tsx file",
+      "description": "As a developer, I am having a lot of issues figuring out how the app is structured since everying is in one file. Also Everything keeps breaking on PRs since there are always merge conflicts",
+      "acceptanceCriteria": [
+        "Each component inside App.tsx is in it's own file",
+        "Components are grouped locally",
+        "Data fetching is done where closest to the related component",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "dependsOn": ["US-015"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
     }
   ]
 }
