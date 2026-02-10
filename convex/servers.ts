@@ -165,7 +165,19 @@ export const deleteServer = mutation({
       .withIndex('by_server_id_created_at', (q) => q.eq('serverId', args.serverId))
       .collect()
 
+    const messagesByChannel = await Promise.all(
+      channels.map((channel) =>
+        ctx.db
+          .query('messages')
+          .withIndex('by_channel_id_created_at', (q) => q.eq('channelId', channel._id))
+          .collect(),
+      ),
+    )
+
+    const messages = messagesByChannel.flat()
+
     await Promise.all(memberships.map((membership) => ctx.db.delete(membership._id)))
+    await Promise.all(messages.map((message) => ctx.db.delete(message._id)))
     await Promise.all(channels.map((channel) => ctx.db.delete(channel._id)))
     await ctx.db.delete(args.serverId)
 
