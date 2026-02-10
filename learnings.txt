@@ -69,3 +69,9 @@
 - Pitfall: Rate limiting in a serverless mutation context has no client IP, so keying on normalized login names is easy to bypass with rotating identifiers.
 - Decision: Use a per-action (`login`/`register`), fixed-window limiter in Convex with temporary lockouts and generic error copy to avoid account enumeration.
 - Reuse: Keep auth hardening centralized in `convex/auth.ts` and reuse helper-level guards in feature modules (`servers/channels/messages`) for baseline input and access validation.
+
+## 2026-02-10 - US-013
+- Worked: Swapping the lint script to `oxlint .` and pruning ESLint packages kept linting setup minimal while preserving Bun-based workflows.
+- Pitfall: Lockfile contents can hide stale ESLint transitive entries until `bun install` is rerun after dependency cleanup.
+- Decision: Remove `eslint.config.js` entirely and rely on Oxlint defaults for the current TypeScript/React surface.
+- Reuse: For future toolchain migrations, change scripts first, remove old config/deps in one pass, then validate with full project checks.
