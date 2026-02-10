@@ -424,6 +424,46 @@
       "assignee": null,
       "passes": true,
       "status": "completed"
+    },
+    {
+      "id": "US-027",
+      "title": "Friends UI for requests and list management",
+      "description": "As a user, I want a dedicated Friends UI to send requests, manage pending requests, and view accepted friends.",
+      "acceptanceCriteria": [
+        "Add a dedicated Friends entry point in authenticated navigation and route to a Friends view",
+        "Friends view includes add-friend input by login name with loading/success/error feedback",
+        "Friends view renders incoming requests with accept and decline actions",
+        "Friends view renders outgoing pending requests with clear pending state",
+        "Friends view renders accepted friends list with clear empty states",
+        "Handle edge cases safely: self-request, duplicate request, invalid login name, already-friends",
+        "Friends and request data update in realtime after send/accept/decline actions",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "dependsOn": ["US-015", "US-017"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-028",
+      "title": "Composer keyboard behavior for send and newline",
+      "description": "As a user, I want Enter to send and Ctrl+Enter to insert a newline so composing messages is fast and predictable.",
+      "acceptanceCriteria": [
+        "Message composer supports multiline input",
+        "Pressing Enter sends the current message",
+        "Pressing Ctrl+Enter inserts a newline at the current caret position",
+        "Send button and keyboard send path share the same validation and auth behavior",
+        "Composer does not send while IME composition is active",
+        "Empty or whitespace-only messages are not sent",
+        "Focus and keyboard usability remain intact after send",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "dependsOn": ["US-015"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
     }
   ]
 }
