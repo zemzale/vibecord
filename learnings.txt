@@ -81,3 +81,9 @@
 - Pitfall: Lockfile contents can hide stale ESLint transitive entries until `bun install` is rerun after dependency cleanup.
 - Decision: Remove `eslint.config.js` entirely and rely on Oxlint defaults for the current TypeScript/React surface.
 - Reuse: For future toolchain migrations, change scripts first, remove old config/deps in one pass, then validate with full project checks.
+
+## 2026-02-10 - US-014
+- Worked: A single GitHub Actions workflow with explicit Bun install/typecheck/lint/test/build steps mirrored local validation and kept CI behavior predictable.
+- Pitfall: Running story work in a bare-repo setup required creating a dedicated worktree branch first; branch switching in existing worktrees would violate story isolation.
+- Decision: Trigger CI on both `pull_request` and `push` (main + owner branches) so checks run before merge and on branch updates.
+- Reuse: For upcoming stories, keep CI steps aligned with `package.json` scripts so local debugging and pipeline failures stay one-to-one.

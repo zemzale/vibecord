@@ -21,6 +21,7 @@ This workflow is mandatory for every coding session.
 - Use Convex for all backend data and server-side logic.
 - Do not include unrelated refactors, formatting sweeps, or dependency upgrades.
 - Do not edit unrelated files.
+- Do not ask the user to run obvious next steps; execute commit/push/PR steps directly when required by this workflow.
 
 ## Dependency Graph Rules
 
