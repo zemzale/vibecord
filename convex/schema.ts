@@ -26,6 +26,16 @@ export default defineSchema({
   })
     .index('by_provider_subject', ['provider', 'providerSubject'])
     .index('by_user_id', ['userId']),
+  authRateLimits: defineTable({
+    action: v.union(v.literal('login'), v.literal('register')),
+    key: v.string(),
+    windowStart: v.number(),
+    attemptCount: v.number(),
+    blockedUntil: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_action_key', ['action', 'key'])
+    .index('by_blocked_until', ['blockedUntil']),
   servers: defineTable({
     name: v.string(),
     ownerId: v.id('users'),

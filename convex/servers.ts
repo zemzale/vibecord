@@ -4,6 +4,10 @@ import type { Id } from './_generated/dataModel'
 
 type ServerMembershipRole = 'owner' | 'member'
 
+function isValidSessionToken(value: string): boolean {
+  return value.length === 64 && /^[0-9a-f]+$/i.test(value)
+}
+
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -13,6 +17,10 @@ async function getAuthenticatedUser(
   ctx: MutationCtx | QueryCtx,
   sessionToken: string,
 ): Promise<Id<'users'>> {
+  if (!isValidSessionToken(sessionToken)) {
+    throw new ConvexError('You must be logged in to continue.')
+  }
+
   const tokenHash = await sha256Hex(sessionToken)
   const now = Date.now()
   const session = await ctx.db

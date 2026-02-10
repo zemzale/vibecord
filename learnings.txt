@@ -63,3 +63,9 @@
 - Pitfall: Route params can become stale when server/channel membership changes, so effects must normalize invalid params back to safe defaults.
 - Decision: Keep routing dependency-free by using browser history APIs, with auth guards and selection normalization handled in React effects.
 - Reuse: For future deep-linkable features, drive selected entities from URL params and navigate after create/join actions to preserve shareable state.
+
+## 2026-02-10 - US-012
+- Worked: Enforcing session-token format checks before DB lookups reduced malformed-auth paths while keeping protected Convex handlers consistent.
+- Pitfall: Rate limiting in a serverless mutation context has no client IP, so keying on normalized login names is easy to bypass with rotating identifiers.
+- Decision: Use a per-action (`login`/`register`), fixed-window limiter in Convex with temporary lockouts and generic error copy to avoid account enumeration.
+- Reuse: Keep auth hardening centralized in `convex/auth.ts` and reuse helper-level guards in feature modules (`servers/channels/messages`) for baseline input and access validation.
