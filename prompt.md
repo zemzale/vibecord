@@ -4,17 +4,25 @@ This workflow is mandatory for every coding session.
 
 ## Scope
 - Source of truth: `PRD.json`
-- One active user story per session
+- One active user story per worker/session
 - No work outside the selected user story unless required to satisfy its acceptance criteria
 
 ## Hard Rules
-- Always pick the highest-priority unfinished story.
-- Never start a second story before finishing, blocking, or explicitly pausing the current one.
+- Always pick the highest-priority ready unfinished story.
+- A story is ready only when all `dependsOn` stories have `passes === true`.
+- Multiple workers may run in parallel, but each worker may own only one active story at a time.
 - Keep all implementation in TypeScript.
 - Use Bun for package management and script execution.
 - Use Convex for all backend data and server-side logic.
 - Do not include unrelated refactors, formatting sweeps, or dependency upgrades.
 - Do not edit unrelated files.
+
+## Dependency Graph Rules
+- Each story may include `dependsOn: string[]` with story IDs.
+- `dependsOn` values must reference existing story IDs.
+- `dependsOn` must not include the story's own ID.
+- Dependency graph must remain acyclic.
+- Stories without `dependsOn` are treated as `dependsOn: []`.
 
 ## Status Model
 Use only these values in the `status` key:
@@ -29,11 +37,13 @@ Use this exact selection logic every session:
 1. Parse `PRD.json.userStories`.
 2. Filter stories where `passes === false`.
 3. Exclude stories where `status === "blocked"` unless explicitly instructed to unblock.
-4. Sort remaining stories by:
+4. Exclude stories where any `dependsOn` story has `passes !== true`.
+5. Exclude stories already assigned to a different worker when `assignee` is present.
+6. Sort remaining stories by:
    - `priority` ascending,
    - then `id` ascending (lexicographic) as tie-breaker.
-5. Select index `0` from that sorted list as the active story.
-6. Immediately set selected story `status` to `in-progress`.
+7. Select index `0` from that sorted list as the active story.
+8. Immediately set selected story `status` to `in-progress` and set `assignee` to current worker/owner.
 
 If no selectable stories exist:
 - report "No actionable stories remaining" and stop implementation.
@@ -56,15 +66,16 @@ jq -r '.userStories
 ## Mandatory Session Procedure
 
 1. Read `PRD.json`.
-2. Select the active story using the deterministic selection logic above.
-3. Immediately update that story `status` to `in-progress`.
+2. Select a ready active story using the deterministic selection logic above.
+3. Immediately update that story `status` to `in-progress` and set `assignee`.
 4. Create and switch to story branch.
 5. Implement only what is needed for that story.
 6. Verify all acceptance criteria one by one.
 7. Run validation commands.
 8. Update `PRD.json`:
-   - `passes: true`
-   - `status: completed`
+    - `passes: true`
+    - `status: completed`
+    - clear `assignee`
 9. Append useful session insights to `learnings.txt`.
 10. Commit, push, and open/update PR.
 
@@ -74,6 +85,7 @@ Run these from project root (adapt only if repo uses different script names):
 ```bash
 bun install
 bun run typecheck
+bun run lint
 bun run test
 bun run build
 ```
@@ -135,6 +147,7 @@ gh pr create \
 
 ## Validation
 - bun run typecheck
+- bun run lint
 - bun run test
 - bun run build
 
