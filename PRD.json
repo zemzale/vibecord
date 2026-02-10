@@ -422,8 +422,8 @@
       "priority": 1,
       "dependsOn": ["US-015"],
       "assignee": null,
-      "passes": false,
-      "status": "unstarted"
+      "passes": true,
+      "status": "completed"
     }
   ]
 }
