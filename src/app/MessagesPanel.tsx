@@ -18,7 +18,7 @@ import type { SessionUser } from "../lib/auth";
 type MessagesPanelProps = {
   activeUser: SessionUser;
   sessionToken: string;
-  route: Extract<AppRoute, { kind: "app" }>;
+  route: Extract<AppRoute, { kind: "app"; section: "chat" }>;
 };
 
 export function MessagesPanel({

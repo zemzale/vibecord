@@ -106,6 +106,12 @@
 - Decision: Keep auth/session flow in `App.tsx` and move server/channel/message data and actions into dedicated panel components.
 - Reuse: For future UI stories, add focused components first, then migrate handlers and queries closest to each component to avoid regressions.
 
+## 2026-02-10 - US-019
+- Worked: Introducing a dedicated `/app/settings` route and centralizing create/join/leave/delete actions in one settings surface removed management noise from chat interactions.
+- Pitfall: Splitting authenticated routes into chat/settings sections required careful type narrowing to avoid passing settings routes into chat-only panels.
+- Decision: Keep chat panes focused on navigation and messaging only, while preserving all server/channel management capabilities inside `SettingsPage`.
+- Reuse: For future shell-level UX changes, model route sections explicitly (`chat` vs `settings`) so feature-specific panels stay type-safe and isolated.
+
 ## 2026-02-10 - US-021
 - Worked: Converting server actions into a true overlay dialog made outside-click dismissal straightforward and predictable.
 - Pitfall: UI tests can leave multiple rendered instances in the DOM, so role/title queries should handle duplicates when asserting modal behavior.

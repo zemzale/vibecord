@@ -1,14 +1,4 @@
-import { ConvexError } from "convex/values";
-import { useMutation } from "convex/react";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type FormEvent,
-  type SetStateAction,
-} from "react";
-import { createServerMutation, joinServerMutation } from "../lib/servers";
+import { useEffect } from "react";
 import type { SessionUser } from "../lib/auth";
 import { createAppPath, FRIENDS_SERVER_ID, type AppRoute } from "./routing";
 import { useAppServers } from "./useAppServers";
@@ -16,11 +6,8 @@ import { useAppServers } from "./useAppServers";
 type ServersSidebarProps = {
   activeUser: SessionUser;
   sessionToken: string;
-  route: Extract<AppRoute, { kind: "app" }>;
+  route: Extract<AppRoute, { kind: "app"; section: "chat" }>;
   navigate: (path: string, options?: { replace?: boolean }) => void;
-  onServerChange: () => void;
-  setGlobalServerError: Dispatch<SetStateAction<string | null>>;
-  globalServerError: string | null;
 };
 
 export function ServersSidebar({
@@ -28,22 +15,7 @@ export function ServersSidebar({
   sessionToken,
   route,
   navigate,
-  onServerChange,
-  setGlobalServerError,
-  globalServerError,
 }: ServersSidebarProps) {
-  const [serverName, setServerName] = useState("");
-  const [joinServerId, setJoinServerId] = useState("");
-  const [joinServerErrorMessage, setJoinServerErrorMessage] = useState<
-    string | null
-  >(null);
-  const [isCreatingServer, setIsCreatingServer] = useState(false);
-  const [isJoiningServer, setIsJoiningServer] = useState(false);
-  const [isServerActionsOpen, setIsServerActionsOpen] = useState(false);
-  const serverActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
-
-  const createServer = useMutation(createServerMutation);
-  const joinServer = useMutation(joinServerMutation);
   const { appServers, myServers, directMessageChannels } = useAppServers({
     activeUser,
     sessionToken,
@@ -63,88 +35,10 @@ export function ServersSidebar({
     }
   }, [appServers, directMessageChannels, myServers, navigate, route.serverId]);
 
-  async function handleCreateServer(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setGlobalServerError(null);
-    setIsCreatingServer(true);
-
-    try {
-      const server = await createServer({
-        sessionToken,
-        name: serverName,
-      });
-      setServerName("");
-      onServerChange();
-      navigate(createAppPath(server.id, null));
-    } catch (error) {
-      if (error instanceof ConvexError && typeof error.data === "string") {
-        setGlobalServerError(error.data);
-      } else {
-        setGlobalServerError(
-          "Unable to create server right now. Please try again.",
-        );
-      }
-    } finally {
-      setIsCreatingServer(false);
-    }
-  }
-
-  async function handleJoinServer(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setJoinServerErrorMessage(null);
-    setGlobalServerError(null);
-    setIsJoiningServer(true);
-
-    try {
-      const server = await joinServer({
-        sessionToken,
-        serverId: joinServerId.trim(),
-      });
-      setJoinServerId("");
-      onServerChange();
-      navigate(createAppPath(server.id, null));
-    } catch (error) {
-      if (error instanceof ConvexError && typeof error.data === "string") {
-        setJoinServerErrorMessage(error.data);
-      } else {
-        setJoinServerErrorMessage(
-          "Unable to join this server right now. Please try again.",
-        );
-      }
-    } finally {
-      setIsJoiningServer(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!isServerActionsOpen) {
-      return;
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsServerActionsOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleEscape);
-    return () => {
-      window.removeEventListener("keydown", handleEscape);
-    };
-  }, [isServerActionsOpen]);
-
-  useEffect(() => {
-    if (isServerActionsOpen) {
-      return;
-    }
-
-    serverActionsTriggerRef.current?.focus();
-  }, [isServerActionsOpen]);
-
   return (
     <aside
       aria-label="Servers"
-      className="relative border-b border-slate-800 bg-slate-950 p-3 lg:border-r lg:border-b-0"
+      className="border-b border-slate-800 bg-slate-950 p-3 lg:border-r lg:border-b-0"
     >
       <p className="mb-2 hidden text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400 lg:block">
         Servers
@@ -166,7 +60,6 @@ export function ServersSidebar({
                 <button
                   type="button"
                   onClick={() => {
-                    onServerChange();
                     navigate(createAppPath(server.id, null));
                   }}
                   title={server.name}
@@ -181,102 +74,8 @@ export function ServersSidebar({
               </li>
             );
           })}
-
-          <li>
-            <button
-              ref={serverActionsTriggerRef}
-              type="button"
-              onClick={() => setIsServerActionsOpen((current) => !current)}
-              title="Create or join server"
-              aria-haspopup="dialog"
-              aria-expanded={isServerActionsOpen}
-              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-2xl leading-none text-cyan-100 transition hover:border-cyan-300 hover:bg-slate-800 lg:h-14 lg:w-14"
-            >
-              +
-            </button>
-          </li>
         </ul>
       )}
-
-      {isServerActionsOpen ? (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/65 p-3"
-          onClick={() => setIsServerActionsOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Server actions"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-3"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-              Server actions
-            </p>
-
-            <form className="mt-3 space-y-2" onSubmit={handleCreateServer}>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Create server
-                </span>
-                <input
-                  type="text"
-                  name="serverName"
-                  value={serverName}
-                  onChange={(event) => setServerName(event.target.value)}
-                  required
-                  minLength={2}
-                  maxLength={64}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
-                  placeholder="Studio Lounge"
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={isCreatingServer}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
-              >
-                {isCreatingServer ? "Creating server..." : "Create server"}
-              </button>
-            </form>
-
-            <form className="mt-4 space-y-2" onSubmit={handleJoinServer}>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Join server by ID
-                </span>
-                <input
-                  type="text"
-                  name="joinServerId"
-                  value={joinServerId}
-                  onChange={(event) => setJoinServerId(event.target.value)}
-                  required
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-300"
-                  placeholder="Enter server ID"
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={isJoiningServer}
-                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isJoiningServer ? "Joining server..." : "Join server"}
-              </button>
-            </form>
-
-            {globalServerError ? (
-              <p className="mt-3 text-sm text-rose-300">{globalServerError}</p>
-            ) : null}
-            {joinServerErrorMessage ? (
-              <p className="mt-2 text-sm text-rose-300">
-                {joinServerErrorMessage}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </aside>
   );
 }
