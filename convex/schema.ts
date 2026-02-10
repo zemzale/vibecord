@@ -33,4 +33,11 @@ export default defineSchema({
   })
     .index('by_owner_id', ['ownerId'])
     .index('by_created_at', ['createdAt']),
+  serverMemberships: defineTable({
+    serverId: v.id('servers'),
+    userId: v.id('users'),
+    joinedAt: v.number(),
+  })
+    .index('by_user_id', ['userId'])
+    .index('by_server_id_user_id', ['serverId', 'userId']),
 })

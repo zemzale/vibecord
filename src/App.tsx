@@ -10,7 +10,12 @@ import {
   SESSION_TOKEN_STORAGE_KEY,
   type SessionUser,
 } from './lib/auth'
-import { createServerMutation, listMyServersQuery } from './lib/servers'
+import {
+  createServerMutation,
+  joinServerMutation,
+  leaveServerMutation,
+  listMyServersQuery,
+} from './lib/servers'
 
 type AuthRoute = 'login' | 'register'
 
@@ -30,8 +35,13 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverName, setServerName] = useState('')
+  const [joinServerId, setJoinServerId] = useState('')
   const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(null)
+  const [joinServerErrorMessage, setJoinServerErrorMessage] = useState<string | null>(null)
+  const [leaveServerErrorMessage, setLeaveServerErrorMessage] = useState<string | null>(null)
   const [isCreatingServer, setIsCreatingServer] = useState(false)
+  const [isJoiningServer, setIsJoiningServer] = useState(false)
+  const [leavingServerId, setLeavingServerId] = useState<string | null>(null)
   const [sessionToken, setSessionToken] = useState<string | null>(readInitialSessionToken)
   const [freshUser, setFreshUser] = useState<SessionUser | null>(null)
 
@@ -39,6 +49,8 @@ function App() {
   const login = useMutation(loginMutation)
   const logout = useMutation(logoutMutation)
   const createServer = useMutation(createServerMutation)
+  const joinServer = useMutation(joinServerMutation)
+  const leaveServer = useMutation(leaveServerMutation)
   const sessionUser = useQuery(
     getSessionUserQuery,
     sessionToken ? { sessionToken } : 'skip',
@@ -167,6 +179,61 @@ function App() {
     }
   }
 
+  async function handleJoinServer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!sessionToken) {
+      setJoinServerErrorMessage('You must be logged in to join a server.')
+      return
+    }
+
+    setJoinServerErrorMessage(null)
+    setLeaveServerErrorMessage(null)
+    setIsJoiningServer(true)
+
+    try {
+      await joinServer({
+        sessionToken,
+        serverId: joinServerId.trim(),
+      })
+      setJoinServerId('')
+    } catch (error) {
+      if (error instanceof ConvexError && typeof error.data === 'string') {
+        setJoinServerErrorMessage(error.data)
+      } else {
+        setJoinServerErrorMessage('Unable to join this server right now. Please try again.')
+      }
+    } finally {
+      setIsJoiningServer(false)
+    }
+  }
+
+  async function handleLeaveServer(serverId: string) {
+    if (!sessionToken) {
+      setLeaveServerErrorMessage('You must be logged in to leave a server.')
+      return
+    }
+
+    setLeaveServerErrorMessage(null)
+    setJoinServerErrorMessage(null)
+    setLeavingServerId(serverId)
+
+    try {
+      await leaveServer({
+        sessionToken,
+        serverId,
+      })
+    } catch (error) {
+      if (error instanceof ConvexError && typeof error.data === 'string') {
+        setLeaveServerErrorMessage(error.data)
+      } else {
+        setLeaveServerErrorMessage('Unable to leave this server right now. Please try again.')
+      }
+    } finally {
+      setLeavingServerId(null)
+    }
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-10 text-slate-900">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -203,6 +270,33 @@ function App() {
               </button>
             </form>
 
+            <form className="space-y-3" onSubmit={handleJoinServer}>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Join server by ID</span>
+                <input
+                  type="text"
+                  name="joinServerId"
+                  value={joinServerId}
+                  onChange={(event) => setJoinServerId(event.target.value)}
+                  required
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm outline-none ring-indigo-200 transition focus:ring"
+                  placeholder="Enter server ID"
+                />
+              </label>
+
+              {joinServerErrorMessage ? <p className="text-sm text-red-600">{joinServerErrorMessage}</p> : null}
+
+              <button
+                type="submit"
+                disabled={isJoiningServer}
+                className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
+              >
+                {isJoiningServer ? 'Joining server...' : 'Join server'}
+              </button>
+            </form>
+
+            {leaveServerErrorMessage ? <p className="text-sm text-red-600">{leaveServerErrorMessage}</p> : null}
+
             <section aria-label="My servers" className="space-y-2">
               <h2 className="text-sm font-semibold text-slate-700">My servers</h2>
               {myServers === undefined ? (
@@ -218,7 +312,25 @@ function App() {
                       key={server.id}
                       className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
                     >
-                      {server.name}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{server.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">ID: {server.id}</p>
+                        </div>
+                        <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600">
+                          {server.membershipRole === 'owner' ? 'Owner' : 'Member'}
+                        </span>
+                      </div>
+                      {server.membershipRole === 'member' ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleLeaveServer(server.id)}
+                          disabled={leavingServerId === server.id}
+                          className="mt-2 inline-flex items-center rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                        >
+                          {leavingServerId === server.id ? 'Leaving...' : 'Leave server'}
+                        </button>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

@@ -2,6 +2,8 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 
+type ServerMembershipRole = 'owner' | 'member'
+
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -59,24 +61,136 @@ export const createServer = mutation({
   },
 })
 
+export const joinServer = mutation({
+  args: {
+    sessionToken: v.string(),
+    serverId: v.id('servers'),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthenticatedUser(ctx, args.sessionToken)
+    const server = await ctx.db.get(args.serverId)
+
+    if (!server) {
+      throw new ConvexError('Server not found.')
+    }
+
+    if (server.ownerId === userId) {
+      throw new ConvexError('You already belong to this server as the owner.')
+    }
+
+    const existingMembership = await ctx.db
+      .query('serverMemberships')
+      .withIndex('by_server_id_user_id', (q) => q.eq('serverId', args.serverId).eq('userId', userId))
+      .unique()
+
+    if (existingMembership) {
+      throw new ConvexError('You are already a member of this server.')
+    }
+
+    await ctx.db.insert('serverMemberships', {
+      serverId: args.serverId,
+      userId,
+      joinedAt: Date.now(),
+    })
+
+    return {
+      id: server._id,
+      name: server.name,
+      ownerId: server.ownerId,
+      createdAt: server.createdAt,
+      membershipRole: 'member' as ServerMembershipRole,
+    }
+  },
+})
+
+export const leaveServer = mutation({
+  args: {
+    sessionToken: v.string(),
+    serverId: v.id('servers'),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthenticatedUser(ctx, args.sessionToken)
+    const server = await ctx.db.get(args.serverId)
+
+    if (!server) {
+      throw new ConvexError('Server not found.')
+    }
+
+    if (server.ownerId === userId) {
+      throw new ConvexError('Server owners cannot leave their own server.')
+    }
+
+    const membership = await ctx.db
+      .query('serverMemberships')
+      .withIndex('by_server_id_user_id', (q) => q.eq('serverId', args.serverId).eq('userId', userId))
+      .unique()
+
+    if (!membership) {
+      throw new ConvexError('You are not a member of this server.')
+    }
+
+    await ctx.db.delete(membership._id)
+
+    return {
+      ok: true,
+      serverId: args.serverId,
+    }
+  },
+})
+
 export const listMyServers = query({
   args: {
     sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthenticatedUser(ctx, args.sessionToken)
-    const servers = await ctx.db
+    const ownedServers = await ctx.db
       .query('servers')
       .withIndex('by_owner_id', (q) => q.eq('ownerId', userId))
       .collect()
 
-    return servers
-      .sort((left, right) => right.createdAt - left.createdAt)
-      .map((server) => ({
+    const memberships = await ctx.db
+      .query('serverMemberships')
+      .withIndex('by_user_id', (q) => q.eq('userId', userId))
+      .collect()
+
+    const memberServerDocs = await Promise.all(memberships.map((membership) => ctx.db.get(membership.serverId)))
+
+    const serversById = new Map<
+      string,
+      {
+        id: Id<'servers'>
+        name: string
+        ownerId: Id<'users'>
+        createdAt: number
+        membershipRole: ServerMembershipRole
+      }
+    >()
+
+    for (const server of ownedServers) {
+      serversById.set(server._id, {
         id: server._id,
         name: server.name,
         ownerId: server.ownerId,
         createdAt: server.createdAt,
-      }))
+        membershipRole: 'owner',
+      })
+    }
+
+    for (const server of memberServerDocs) {
+      if (!server || serversById.has(server._id)) {
+        continue
+      }
+
+      serversById.set(server._id, {
+        id: server._id,
+        name: server.name,
+        ownerId: server.ownerId,
+        createdAt: server.createdAt,
+        membershipRole: 'member',
+      })
+    }
+
+    return Array.from(serversById.values()).sort((left, right) => right.createdAt - left.createdAt)
   },
 })
