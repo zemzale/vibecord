@@ -159,6 +159,7 @@ function App() {
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
     null,
   );
+  const [isServerActionsOpen, setIsServerActionsOpen] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(
     readInitialSessionToken,
   );
@@ -666,11 +667,11 @@ function App() {
   const isAuthPage = route.kind === "login" || route.kind === "register";
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#1f2a52_0%,_#0f1224_45%,_#090b16_100%)] px-3 py-4 text-slate-100 sm:px-5 lg:px-8 lg:py-6">
+    <main className="min-h-screen bg-slate-950 text-slate-100">
       {activeUser && route.kind === "app" ? (
-        <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3">
-          <header className="rounded-2xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 shadow-lg shadow-black/30 backdrop-blur">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-h-screen w-full flex-col">
+          <header className="h-16 border-b border-slate-800 bg-slate-950 px-4">
+            <div className="flex h-full flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/80">
                   VibeCord
@@ -689,10 +690,10 @@ function App() {
             </div>
           </header>
 
-          <div className="grid gap-3 lg:grid-cols-[5.5rem_20rem_minmax(0,1fr)]">
+          <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[5.5rem_20rem_minmax(0,1fr)]">
             <aside
               aria-label="Servers"
-              className="rounded-2xl border border-slate-800/80 bg-slate-950/65 p-3 shadow-lg shadow-black/30 backdrop-blur"
+              className="relative border-b border-slate-800 bg-slate-950 p-3 lg:border-r lg:border-b-0"
             >
               <p className="mb-2 hidden text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400 lg:block">
                 Servers
@@ -730,13 +731,104 @@ function App() {
                       </li>
                     );
                   })}
+
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIsServerActionsOpen((current) => !current)
+                      }
+                      title="Create or join server"
+                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-2xl leading-none text-cyan-100 transition hover:border-cyan-300 hover:bg-slate-800 lg:h-14 lg:w-14"
+                    >
+                      +
+                    </button>
+                  </li>
                 </ul>
               )}
+
+              {isServerActionsOpen ? (
+                <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900 p-3 lg:absolute lg:left-full lg:top-3 lg:mt-0 lg:ml-3 lg:w-72 lg:z-20">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                    Server actions
+                  </p>
+
+                  <form
+                    className="mt-3 space-y-2"
+                    onSubmit={handleCreateServer}
+                  >
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Create server
+                      </span>
+                      <input
+                        type="text"
+                        name="serverName"
+                        value={serverName}
+                        onChange={(event) => setServerName(event.target.value)}
+                        required
+                        minLength={2}
+                        maxLength={64}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                        placeholder="Studio Lounge"
+                      />
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={isCreatingServer}
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+                    >
+                      {isCreatingServer
+                        ? "Creating server..."
+                        : "Create server"}
+                    </button>
+                  </form>
+
+                  <form className="mt-4 space-y-2" onSubmit={handleJoinServer}>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Join server by ID
+                      </span>
+                      <input
+                        type="text"
+                        name="joinServerId"
+                        value={joinServerId}
+                        onChange={(event) =>
+                          setJoinServerId(event.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                        placeholder="Enter server ID"
+                      />
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={isJoiningServer}
+                      className="inline-flex w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isJoiningServer ? "Joining server..." : "Join server"}
+                    </button>
+                  </form>
+
+                  {serverErrorMessage ? (
+                    <p className="mt-3 text-sm text-rose-300">
+                      {serverErrorMessage}
+                    </p>
+                  ) : null}
+                  {joinServerErrorMessage ? (
+                    <p className="mt-2 text-sm text-rose-300">
+                      {joinServerErrorMessage}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </aside>
 
             <section
               aria-label="Channels"
-              className="rounded-2xl border border-slate-800/80 bg-slate-950/65 p-4 shadow-lg shadow-black/30 backdrop-blur"
+              className="border-b border-slate-800 bg-slate-950 p-4 lg:border-r lg:border-b-0"
             >
               <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
                 Channels
@@ -808,68 +900,6 @@ function App() {
                 </div>
               ) : null}
 
-              <form className="mt-4 space-y-2" onSubmit={handleCreateServer}>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Create server
-                  </span>
-                  <input
-                    type="text"
-                    name="serverName"
-                    value={serverName}
-                    onChange={(event) => setServerName(event.target.value)}
-                    required
-                    minLength={2}
-                    maxLength={64}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
-                    placeholder="Studio Lounge"
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={isCreatingServer}
-                  className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
-                >
-                  {isCreatingServer ? "Creating server..." : "Create server"}
-                </button>
-              </form>
-
-              <form className="mt-4 space-y-2" onSubmit={handleJoinServer}>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Join server by ID
-                  </span>
-                  <input
-                    type="text"
-                    name="joinServerId"
-                    value={joinServerId}
-                    onChange={(event) => setJoinServerId(event.target.value)}
-                    required
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-300"
-                    placeholder="Enter server ID"
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={isJoiningServer}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isJoiningServer ? "Joining server..." : "Join server"}
-                </button>
-              </form>
-
-              {serverErrorMessage ? (
-                <p className="mt-3 text-sm text-rose-300">
-                  {serverErrorMessage}
-                </p>
-              ) : null}
-              {joinServerErrorMessage ? (
-                <p className="mt-2 text-sm text-rose-300">
-                  {joinServerErrorMessage}
-                </p>
-              ) : null}
               {leaveServerErrorMessage ? (
                 <p className="mt-2 text-sm text-rose-300">
                   {leaveServerErrorMessage}
@@ -980,7 +1010,7 @@ function App() {
 
             <section
               aria-label="Messages"
-              className="rounded-2xl border border-slate-800/80 bg-slate-950/65 p-4 shadow-lg shadow-black/30 backdrop-blur"
+              className="flex min-h-[26rem] flex-col bg-slate-950 p-4 lg:min-h-0"
             >
               <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
                 Messages
@@ -1003,7 +1033,65 @@ function App() {
                     </span>
                   </p>
 
-                  <form className="mt-3 space-y-3" onSubmit={handleSendMessage}>
+                  {messageErrorMessage ? (
+                    <p className="mt-3 text-sm text-rose-300">
+                      {messageErrorMessage}
+                    </p>
+                  ) : null}
+
+                  {messages === undefined ? (
+                    <p className="mt-3 text-sm text-slate-400">
+                      Loading messages...
+                    </p>
+                  ) : messages.length === 0 ? (
+                    <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                      No messages yet. Start the conversation.
+                    </p>
+                  ) : (
+                    <div className="mt-3 flex-1 overflow-y-auto pr-1">
+                      <ul className="space-y-2">
+                        {messages.map((message) => (
+                          <li
+                            key={message.id}
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
+                                  {message.authorLoginName}
+                                </p>
+                                <p className="shrink-0 text-[11px] text-slate-400">
+                                  {new Date(message.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                              {message.canDelete ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleDeleteMessage(message.id)
+                                  }
+                                  disabled={deletingMessageId === message.id}
+                                  className="inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {deletingMessageId === message.id
+                                    ? "Deleting..."
+                                    : "Delete"}
+                                </button>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-slate-200">
+                              {message.content}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <form
+                    className="mt-3 border-t border-slate-800 bg-slate-950 pt-3"
+                    onSubmit={handleSendMessage}
+                  >
                     <label className="block">
                       <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
                         Message
@@ -1025,64 +1113,11 @@ function App() {
                     <button
                       type="submit"
                       disabled={isSendingMessage}
-                      className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+                      className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
                     >
                       {isSendingMessage ? "Sending..." : "Send message"}
                     </button>
                   </form>
-
-                  {messageErrorMessage ? (
-                    <p className="mt-3 text-sm text-rose-300">
-                      {messageErrorMessage}
-                    </p>
-                  ) : null}
-
-                  {messages === undefined ? (
-                    <p className="mt-3 text-sm text-slate-400">
-                      Loading messages...
-                    </p>
-                  ) : messages.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
-                      No messages yet. Start the conversation.
-                    </p>
-                  ) : (
-                    <ul className="mt-3 space-y-2">
-                      {messages.map((message) => (
-                        <li
-                          key={message.id}
-                          className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
-                                {message.authorLoginName}
-                              </p>
-                              <p className="shrink-0 text-[11px] text-slate-400">
-                                {new Date(message.createdAt).toLocaleString()}
-                              </p>
-                            </div>
-                            {message.canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void handleDeleteMessage(message.id)
-                                }
-                                disabled={deletingMessageId === message.id}
-                                className="inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {deletingMessageId === message.id
-                                  ? "Deleting..."
-                                  : "Delete"}
-                              </button>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 whitespace-pre-wrap text-slate-200">
-                            {message.content}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </>
               )}
             </section>
