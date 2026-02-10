@@ -15,3 +15,9 @@
 - Pitfall: Session state can momentarily hydrate as unknown, so redirect logic must wait for `getSessionUser` to resolve before forcing logout.
 - Decision: Use one generic login failure message for missing users and bad passwords to avoid credential enumeration.
 - Reuse: Treat authenticated UI as a protected view backed by a token query; on token mismatch, clear local storage and send users back to login.
+
+## 2026-02-10 - US-004
+- Worked: Introducing an `authAccounts` table with provider + subject keys created a reusable identity boundary while keeping current credentials auth intact.
+- Pitfall: Migrating toward provider-linked auth can break existing credential lookups unless login keeps a fallback path for legacy records.
+- Decision: Keep social buttons visibly disabled with clear "coming soon" copy so UI promises future OAuth without implying current support.
+- Reuse: For future OAuth providers, map provider identity into `authAccounts` first, then issue sessions through the same shared auth/session path.

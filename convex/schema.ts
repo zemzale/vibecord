@@ -17,4 +17,13 @@ export default defineSchema({
   })
     .index('by_token_hash', ['tokenHash'])
     .index('by_user_id', ['userId']),
+  authAccounts: defineTable({
+    userId: v.id('users'),
+    provider: v.union(v.literal('credentials'), v.literal('google'), v.literal('github')),
+    providerSubject: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.number(),
+  })
+    .index('by_provider_subject', ['provider', 'providerSubject'])
+    .index('by_user_id', ['userId']),
 })

@@ -5,6 +5,13 @@ export type SessionUser = {
   loginName: string
 }
 
+export type SocialAuthProvider = 'google' | 'github'
+
+export const SOCIAL_AUTH_PROVIDERS: ReadonlyArray<{ id: SocialAuthProvider; label: string }> = [
+  { id: 'google', label: 'Continue with Google' },
+  { id: 'github', label: 'Continue with GitHub' },
+]
+
 export const registerMutation = makeFunctionReference<
   'mutation',
   {
