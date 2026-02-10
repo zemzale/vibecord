@@ -99,3 +99,9 @@
 - Pitfall: Merging server and DM channel flows in one view requires explicit branching for selection, query args, and permission UI.
 - Decision: Use a virtual `Friends` server entry and route DM send/list through dedicated Convex direct message handlers.
 - Reuse: Keep special spaces like DMs as virtual navigation entries layered over existing server routing primitives.
+
+## 2026-02-10 - US-026
+- Worked: Splitting the app into route/auth/shell/panel modules reduced cross-cutting edits and kept each feature surface easier to reason about.
+- Pitfall: Moving logic across files can leave stale imports and type references that only show up once full TypeScript validation runs.
+- Decision: Keep auth/session flow in `App.tsx` and move server/channel/message data and actions into dedicated panel components.
+- Reuse: For future UI stories, add focused components first, then migrate handlers and queries closest to each component to avoid regressions.
