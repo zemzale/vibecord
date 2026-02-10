@@ -171,7 +171,7 @@ export function MessagesPanel({
                 {messages.map((message) => (
                   <li
                     key={message.id}
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                    className="group rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -187,7 +187,11 @@ export function MessagesPanel({
                           type="button"
                           onClick={() => void handleDeleteMessage(message.id)}
                           disabled={deletingMessageId === message.id}
-                          className="inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          className={`inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 transition-opacity duration-150 disabled:cursor-not-allowed disabled:opacity-60 ${
+                            deletingMessageId === message.id
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                          }`}
                         >
                           {deletingMessageId === message.id
                             ? "Deleting..."

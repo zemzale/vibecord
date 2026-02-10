@@ -106,6 +106,12 @@
 - Decision: Keep auth/session flow in `App.tsx` and move server/channel/message data and actions into dedicated panel components.
 - Reuse: For future UI stories, add focused components first, then migrate handlers and queries closest to each component to avoid regressions.
 
+## 2026-02-10 - US-023
+- Worked: Using Tailwind `group-hover` and `group-focus-within` on each message row hid delete actions by default without changing message permissions.
+- Pitfall: Pure hover behavior breaks keyboard discoverability, so focus states must also reveal row actions.
+- Decision: Keep delete controls fully visible while deletion is pending so users keep clear feedback during mutation latency.
+- Reuse: For future action-density cleanup, prefer opacity-based reveal patterns that preserve existing handlers and authorization logic.
+
 ## 2026-02-10 - US-016
 - Worked: Route normalization effects in server and channel panels reliably redirected server-only paths to the first available channel once data loaded.
 - Pitfall: Invalid URL params can look valid until queries resolve, so fallback navigation needs to wait for server/channel data before replacing history.
