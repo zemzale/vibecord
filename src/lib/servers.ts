@@ -5,6 +5,7 @@ export type ServerRecord = {
   name: string
   ownerId: string
   createdAt: number
+  membershipRole: 'owner' | 'member'
 }
 
 export const createServerMutation = makeFunctionReference<
@@ -23,3 +24,24 @@ export const listMyServersQuery = makeFunctionReference<
   },
   Array<ServerRecord>
 >('servers:listMyServers')
+
+export const joinServerMutation = makeFunctionReference<
+  'mutation',
+  {
+    sessionToken: string
+    serverId: string
+  },
+  ServerRecord
+>('servers:joinServer')
+
+export const leaveServerMutation = makeFunctionReference<
+  'mutation',
+  {
+    sessionToken: string
+    serverId: string
+  },
+  {
+    ok: boolean
+    serverId: string
+  }
+>('servers:leaveServer')

@@ -27,3 +27,9 @@
 - Pitfall: Hook order matters in React; dependent queries must be declared after derived auth state to avoid referencing values before initialization.
 - Decision: Scope "my servers" to owner-created servers for this story and defer membership-based listing to the join/leave story.
 - Reuse: For future protected features, centralize session-token validation in shared Convex helpers so every query/mutation enforces auth consistently.
+
+## 2026-02-10 - US-006
+- Worked: A dedicated `serverMemberships` table plus a combined owner/member server query made join/leave updates appear immediately in one realtime list.
+- Pitfall: Free-text server IDs can fail Convex ID validation before business logic, so UI must surface safe join errors clearly.
+- Decision: Keep owner membership implicit (via `servers.ownerId`) and block owner leave operations to preserve ownership invariants.
+- Reuse: For upcoming channel/message permissions, enforce access with shared auth helpers and membership index lookups in Convex before any mutation logic.
