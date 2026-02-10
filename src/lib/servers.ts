@@ -45,3 +45,15 @@ export const leaveServerMutation = makeFunctionReference<
     serverId: string
   }
 >('servers:leaveServer')
+
+export const deleteServerMutation = makeFunctionReference<
+  'mutation',
+  {
+    sessionToken: string
+    serverId: string
+  },
+  {
+    ok: boolean
+    serverId: string
+  }
+>('servers:deleteServer')
