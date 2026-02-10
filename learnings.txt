@@ -81,3 +81,9 @@
 - Pitfall: Lockfile contents can hide stale ESLint transitive entries until `bun install` is rerun after dependency cleanup.
 - Decision: Remove `eslint.config.js` entirely and rely on Oxlint defaults for the current TypeScript/React surface.
 - Reuse: For future toolchain migrations, change scripts first, remove old config/deps in one pass, then validate with full project checks.
+
+## 2026-02-10 - US-015
+- Worked: Restructuring the authenticated app into a dedicated server icon rail, channel sidebar, and message pane kept existing data/mutation logic intact while delivering the new shell UX.
+- Pitfall: Global dark themes can make validation and status text hard to scan unless accent and error colors are tuned for contrast against deep slate backgrounds.
+- Decision: Keep all management interactions in the channel pane for now so the icon rail stays focused on server switching and remains usable on narrow mobile widths.
+- Reuse: For future UI stories, prefer class-level visual overhauls around stable handlers instead of rewiring app state to reduce regression risk.
