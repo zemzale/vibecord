@@ -75,3 +75,9 @@
 - Pitfall: Duplicate request checks must be bidirectional; only validating requester->recipient misses pending requests in the opposite direction.
 - Decision: Keep request response rights recipient-only and create friendships only on explicit accept to preserve a clear mutual request flow.
 - Reuse: For future DM routing, consume the `listFriends` query result directly so friend relationships remain server-authoritative and realtime.
+
+## 2026-02-10 - US-013
+- Worked: Swapping the lint script to `oxlint .` and pruning ESLint packages kept linting setup minimal while preserving Bun-based workflows.
+- Pitfall: Lockfile contents can hide stale ESLint transitive entries until `bun install` is rerun after dependency cleanup.
+- Decision: Remove `eslint.config.js` entirely and rely on Oxlint defaults for the current TypeScript/React surface.
+- Reuse: For future toolchain migrations, change scripts first, remove old config/deps in one pass, then validate with full project checks.
