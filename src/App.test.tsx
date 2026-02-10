@@ -15,6 +15,8 @@ describe('App', () => {
     expect(screen.getByText('Login to access your account.')).toBeInTheDocument()
     expect(screen.getByLabelText('Login name')).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Google (coming soon)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with GitHub (coming soon)' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
   })
 })

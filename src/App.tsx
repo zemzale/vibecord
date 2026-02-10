@@ -6,6 +6,7 @@ import {
   loginMutation,
   logoutMutation,
   registerMutation,
+  SOCIAL_AUTH_PROVIDERS,
   SESSION_TOKEN_STORAGE_KEY,
   type SessionUser,
 } from './lib/auth'
@@ -151,6 +152,23 @@ function App() {
           <>
             <p className="mt-2 text-sm text-slate-600">
               {authRoute === 'login' ? 'Login to access your account.' : 'Create your account to continue.'}
+            </p>
+
+            <div className="mt-4 space-y-2" aria-label="Social sign-in providers">
+              {SOCIAL_AUTH_PROVIDERS.map((provider) => (
+                <button
+                  key={provider.id}
+                  type="button"
+                  disabled
+                  className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-500"
+                >
+                  {provider.label} (coming soon)
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500">
+              OAuth providers are planned. Use login name + password for this MVP.
             </p>
 
             <form

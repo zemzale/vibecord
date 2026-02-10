@@ -4,6 +4,9 @@ import type { Id } from './_generated/dataModel'
 
 const HASH_ITERATIONS = 120_000
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
+const CREDENTIALS_PROVIDER = 'credentials' as const
+
+type AuthProvider = 'credentials' | 'google' | 'github'
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('')
@@ -70,6 +73,64 @@ async function createSession(ctx: MutationCtx, userId: Id<'users'>) {
   return sessionToken
 }
 
+async function upsertAuthAccount(
+  ctx: MutationCtx,
+  args: {
+    userId: Id<'users'>
+    provider: AuthProvider
+    providerSubject: string
+  },
+) {
+  const existing = await ctx.db
+    .query('authAccounts')
+    .withIndex('by_provider_subject', (q) =>
+      q.eq('provider', args.provider).eq('providerSubject', args.providerSubject),
+    )
+    .unique()
+
+  const timestamp = Date.now()
+
+  if (existing) {
+    if (existing.userId !== args.userId) {
+      throw new ConvexError('Auth provider account is already linked to another user.')
+    }
+
+    await ctx.db.patch(existing._id, {
+      lastUsedAt: timestamp,
+    })
+    return
+  }
+
+  await ctx.db.insert('authAccounts', {
+    userId: args.userId,
+    provider: args.provider,
+    providerSubject: args.providerSubject,
+    createdAt: timestamp,
+    lastUsedAt: timestamp,
+  })
+}
+
+async function findUserForProvider(
+  ctx: MutationCtx,
+  args: {
+    provider: AuthProvider
+    providerSubject: string
+  },
+) {
+  const account = await ctx.db
+    .query('authAccounts')
+    .withIndex('by_provider_subject', (q) =>
+      q.eq('provider', args.provider).eq('providerSubject', args.providerSubject),
+    )
+    .unique()
+
+  if (!account) {
+    return null
+  }
+
+  return ctx.db.get(account.userId)
+}
+
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return bytesToHex(new Uint8Array(digest))
@@ -122,6 +183,12 @@ export const register = mutation({
       createdAt,
     })
 
+    await upsertAuthAccount(ctx, {
+      userId,
+      provider: CREDENTIALS_PROVIDER,
+      providerSubject: normalized,
+    })
+
     const sessionToken = await createSession(ctx, userId)
 
     return {
@@ -147,10 +214,17 @@ export const login = mutation({
       throw new ConvexError('Invalid login credentials.')
     }
 
-    const user = await ctx.db
-      .query('users')
-      .withIndex('by_login_name_lower', (q) => q.eq('loginNameLower', normalized))
-      .unique()
+    const accountUser = await findUserForProvider(ctx, {
+      provider: CREDENTIALS_PROVIDER,
+      providerSubject: normalized,
+    })
+
+    const user =
+      accountUser ??
+      (await ctx.db
+        .query('users')
+        .withIndex('by_login_name_lower', (q) => q.eq('loginNameLower', normalized))
+        .unique())
 
     if (!user) {
       throw new ConvexError('Invalid login credentials.')
@@ -160,6 +234,12 @@ export const login = mutation({
     if (!constantTimeEqual(candidateHash, user.passwordHash)) {
       throw new ConvexError('Invalid login credentials.')
     }
+
+    await upsertAuthAccount(ctx, {
+      userId: user._id,
+      provider: CREDENTIALS_PROVIDER,
+      providerSubject: normalized,
+    })
 
     const sessionToken = await createSession(ctx, user._id)
 
