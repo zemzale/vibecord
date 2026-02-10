@@ -45,3 +45,9 @@
 - Pitfall: Channel permissions need explicit rule boundaries; allowing delete only for server owners or channel creators keeps moderation behavior predictable for MVP.
 - Decision: Keep channel creation open to any server member while enforcing list/create/delete authorization in Convex.
 - Reuse: Drive channel UI from selected server state and let Convex realtime queries handle create/delete refresh automatically.
+
+## 2026-02-10 - US-009
+- Worked: Adding a channel-scoped messages table with a `by_channel_id_created_at` index made chronological realtime message rendering straightforward.
+- Pitfall: Introducing messages requires delete-path cleanup; channel/server deletion now needs message cascading to avoid orphaned rows.
+- Decision: Enforce channel access by re-checking server ownership/membership for both `sendMessage` and `listMessages` to keep read/write authorization symmetric.
+- Reuse: For future chat features (edits/deletes), return enriched message view models (author + timestamp) directly from Convex queries to keep UI logic thin.

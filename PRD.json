@@ -153,8 +153,8 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
-      "status": "unstarted"
+      "passes": true,
+      "status": "completed"
     },
     {
       "id": "US-010",

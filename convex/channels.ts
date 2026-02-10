@@ -123,6 +123,12 @@ export const deleteChannel = mutation({
       throw new ConvexError('Only the channel creator or server owner can delete this channel.')
     }
 
+    const messages = await ctx.db
+      .query('messages')
+      .withIndex('by_channel_id_created_at', (q) => q.eq('channelId', channel._id))
+      .collect()
+
+    await Promise.all(messages.map((message) => ctx.db.delete(message._id)))
     await ctx.db.delete(channel._id)
 
     return {

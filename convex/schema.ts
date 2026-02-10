@@ -49,4 +49,10 @@ export default defineSchema({
   })
     .index('by_server_id_created_at', ['serverId', 'createdAt'])
     .index('by_server_id_name_lower', ['serverId', 'nameLower']),
+  messages: defineTable({
+    channelId: v.id('channels'),
+    authorId: v.id('users'),
+    content: v.string(),
+    createdAt: v.number(),
+  }).index('by_channel_id_created_at', ['channelId', 'createdAt']),
 })
