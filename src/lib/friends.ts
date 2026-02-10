@@ -16,8 +16,26 @@ export type OutgoingFriendRequestRecord = {
 
 export type FriendRecord = {
   id: string;
+  friendshipId: string;
   loginName: string;
   since: number;
+};
+
+export type DirectMessageChannelRecord = {
+  id: string;
+  friendId: string;
+  friendLoginName: string;
+  createdAt: number;
+};
+
+export type DirectMessageRecord = {
+  id: string;
+  friendshipId: string;
+  authorId: string;
+  authorLoginName: string;
+  content: string;
+  createdAt: number;
+  canDelete: boolean;
 };
 
 export const sendFriendRequestMutation = makeFunctionReference<
@@ -67,3 +85,30 @@ export const listFriendsQuery = makeFunctionReference<
   },
   Array<FriendRecord>
 >("friends:listFriends");
+
+export const listDirectMessageChannelsQuery = makeFunctionReference<
+  "query",
+  {
+    sessionToken: string;
+  },
+  Array<DirectMessageChannelRecord>
+>("friends:listDirectMessageChannels");
+
+export const sendDirectMessageMutation = makeFunctionReference<
+  "mutation",
+  {
+    sessionToken: string;
+    friendshipId: string;
+    content: string;
+  },
+  DirectMessageRecord
+>("directMessages:sendDirectMessage");
+
+export const listDirectMessagesQuery = makeFunctionReference<
+  "query",
+  {
+    sessionToken: string;
+    friendshipId: string;
+  },
+  Array<DirectMessageRecord>
+>("directMessages:listDirectMessages");

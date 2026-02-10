@@ -93,3 +93,9 @@
 - Pitfall: Global dark themes can make validation and status text hard to scan unless accent and error colors are tuned for contrast against deep slate backgrounds.
 - Decision: Keep all management interactions in the channel pane for now so the icon rail stays focused on server switching and remains usable on narrow mobile widths.
 - Reuse: For future UI stories, prefer class-level visual overhauls around stable handlers instead of rewiring app state to reduce regression risk.
+
+## 2026-02-10 - US-018
+- Worked: Treating each accepted friendship as the DM channel key kept Friends navigation simple while preserving realtime updates.
+- Pitfall: Merging server and DM channel flows in one view requires explicit branching for selection, query args, and permission UI.
+- Decision: Use a virtual `Friends` server entry and route DM send/list through dedicated Convex direct message handlers.
+- Reuse: Keep special spaces like DMs as virtual navigation entries layered over existing server routing primitives.
