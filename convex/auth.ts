@@ -5,8 +5,25 @@ import type { Id } from './_generated/dataModel'
 const HASH_ITERATIONS = 120_000
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
 const CREDENTIALS_PROVIDER = 'credentials' as const
+const SESSION_TOKEN_BYTE_LENGTH = 32
+const SESSION_TOKEN_HEX_LENGTH = SESSION_TOKEN_BYTE_LENGTH * 2
+const AUTH_RATE_LIMIT_WINDOW_MS = 1000 * 60 * 10
+const AUTH_RATE_LIMIT_BLOCK_MS = 1000 * 60 * 10
+const AUTH_RATE_LIMIT_MAX_ATTEMPTS: Record<'login' | 'register', number> = {
+  login: 5,
+  register: 5,
+}
 
 type AuthProvider = 'credentials' | 'google' | 'github'
+type AuthRateLimitAction = 'login' | 'register'
+
+type AuthRateLimitState = {
+  id: Id<'authRateLimits'> | null
+  action: AuthRateLimitAction
+  key: string
+  windowStart: number
+  attemptCount: number
+}
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('')
@@ -18,14 +35,18 @@ function randomHex(byteLength: number): string {
   return bytesToHex(bytes)
 }
 
+function isValidSessionToken(value: string): boolean {
+  return value.length === SESSION_TOKEN_HEX_LENGTH && /^[0-9a-f]+$/i.test(value)
+}
+
 function hexToBytes(hex: string): Uint8Array {
-  return new Uint8Array(hex.match(/.{1,2}/g)?.map((pair) => Number.parseInt(pair, 16)) ?? [])
+  return Uint8Array.from(hex.match(/.{1,2}/g)?.map((pair) => Number.parseInt(pair, 16)) ?? [])
 }
 
 async function derivePasswordHash(password: string, saltHex: string): Promise<string> {
   const encoder = new TextEncoder()
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits'])
-  const salt = hexToBytes(saltHex)
+  const salt = hexToBytes(saltHex).buffer as ArrayBuffer
 
   const bits = await crypto.subtle.deriveBits(
     {
@@ -58,7 +79,7 @@ function constantTimeEqual(leftHex: string, rightHex: string): boolean {
 }
 
 async function createSession(ctx: MutationCtx, userId: Id<'users'>) {
-  const sessionToken = randomHex(32)
+  const sessionToken = randomHex(SESSION_TOKEN_BYTE_LENGTH)
   const tokenHash = await sha256Hex(sessionToken)
   const createdAt = Date.now()
   const expiresAt = createdAt + SESSION_TTL_MS
@@ -71,6 +92,77 @@ async function createSession(ctx: MutationCtx, userId: Id<'users'>) {
   })
 
   return sessionToken
+}
+
+async function getRateLimitState(
+  ctx: MutationCtx,
+  action: AuthRateLimitAction,
+  key: string,
+): Promise<AuthRateLimitState> {
+  const now = Date.now()
+  const existing = await ctx.db
+    .query('authRateLimits')
+    .withIndex('by_action_key', (q) => q.eq('action', action).eq('key', key))
+    .unique()
+
+  if (!existing) {
+    return {
+      id: null,
+      action,
+      key,
+      windowStart: now,
+      attemptCount: 0,
+    }
+  }
+
+  if (existing.blockedUntil > now) {
+    throw new ConvexError('Too many attempts. Please try again later.')
+  }
+
+  const sameWindow = now - existing.windowStart < AUTH_RATE_LIMIT_WINDOW_MS
+  return {
+    id: existing._id,
+    action,
+    key,
+    windowStart: sameWindow ? existing.windowStart : now,
+    attemptCount: sameWindow ? existing.attemptCount : 0,
+  }
+}
+
+async function clearRateLimitState(ctx: MutationCtx, state: AuthRateLimitState): Promise<void> {
+  if (!state.id) {
+    return
+  }
+
+  await ctx.db.delete(state.id)
+}
+
+async function recordRateLimitFailure(ctx: MutationCtx, state: AuthRateLimitState): Promise<void> {
+  const now = Date.now()
+  const nextAttemptCount = state.attemptCount + 1
+  const maxAttempts = AUTH_RATE_LIMIT_MAX_ATTEMPTS[state.action]
+  const blockedUntil = nextAttemptCount >= maxAttempts ? now + AUTH_RATE_LIMIT_BLOCK_MS : 0
+
+  const patch = {
+    windowStart: state.windowStart,
+    attemptCount: nextAttemptCount,
+    blockedUntil,
+    updatedAt: now,
+  }
+
+  if (state.id) {
+    await ctx.db.patch(state.id, patch)
+  } else {
+    await ctx.db.insert('authRateLimits', {
+      action: state.action,
+      key: state.key,
+      ...patch,
+    })
+  }
+
+  if (blockedUntil > now) {
+    throw new ConvexError('Too many attempts. Please try again later.')
+  }
 }
 
 async function upsertAuthAccount(
@@ -162,12 +254,15 @@ export const register = mutation({
       throw new ConvexError('Password must be at least 8 characters long.')
     }
 
+    const rateLimitState = await getRateLimitState(ctx, 'register', normalized)
+
     const existingUser = await ctx.db
       .query('users')
       .withIndex('by_login_name_lower', (q) => q.eq('loginNameLower', normalized))
       .unique()
 
     if (existingUser) {
+      await recordRateLimitFailure(ctx, rateLimitState)
       throw new ConvexError('Login name is already in use.')
     }
 
@@ -190,6 +285,7 @@ export const register = mutation({
     })
 
     const sessionToken = await createSession(ctx, userId)
+    await clearRateLimitState(ctx, rateLimitState)
 
     return {
       sessionToken,
@@ -214,6 +310,8 @@ export const login = mutation({
       throw new ConvexError('Invalid login credentials.')
     }
 
+    const rateLimitState = await getRateLimitState(ctx, 'login', normalized)
+
     const accountUser = await findUserForProvider(ctx, {
       provider: CREDENTIALS_PROVIDER,
       providerSubject: normalized,
@@ -227,11 +325,13 @@ export const login = mutation({
         .unique())
 
     if (!user) {
+      await recordRateLimitFailure(ctx, rateLimitState)
       throw new ConvexError('Invalid login credentials.')
     }
 
     const candidateHash = await derivePasswordHash(password, user.passwordSalt)
     if (!constantTimeEqual(candidateHash, user.passwordHash)) {
+      await recordRateLimitFailure(ctx, rateLimitState)
       throw new ConvexError('Invalid login credentials.')
     }
 
@@ -242,6 +342,7 @@ export const login = mutation({
     })
 
     const sessionToken = await createSession(ctx, user._id)
+    await clearRateLimitState(ctx, rateLimitState)
 
     return {
       sessionToken,
@@ -258,6 +359,10 @@ export const logout = mutation({
     sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
+    if (!isValidSessionToken(args.sessionToken)) {
+      return { ok: true }
+    }
+
     const tokenHash = await sha256Hex(args.sessionToken)
     const session = await ctx.db
       .query('sessions')
@@ -277,6 +382,10 @@ export const getSessionUser = query({
     sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
+    if (!isValidSessionToken(args.sessionToken)) {
+      return null
+    }
+
     const tokenHash = await sha256Hex(args.sessionToken)
     const now = Date.now()
     const session = await ctx.db
