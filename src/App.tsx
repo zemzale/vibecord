@@ -17,6 +17,11 @@ import {
   leaveServerMutation,
   listMyServersQuery,
 } from './lib/servers'
+import {
+  createChannelMutation,
+  deleteChannelMutation,
+  listChannelsQuery,
+} from './lib/channels'
 
 type AuthRoute = 'login' | 'register'
 
@@ -36,15 +41,20 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverName, setServerName] = useState('')
+  const [selectedServerId, setSelectedServerId] = useState('')
+  const [channelName, setChannelName] = useState('')
   const [joinServerId, setJoinServerId] = useState('')
   const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(null)
   const [joinServerErrorMessage, setJoinServerErrorMessage] = useState<string | null>(null)
   const [leaveServerErrorMessage, setLeaveServerErrorMessage] = useState<string | null>(null)
   const [deleteServerErrorMessage, setDeleteServerErrorMessage] = useState<string | null>(null)
+  const [channelErrorMessage, setChannelErrorMessage] = useState<string | null>(null)
   const [isCreatingServer, setIsCreatingServer] = useState(false)
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false)
   const [isJoiningServer, setIsJoiningServer] = useState(false)
   const [leavingServerId, setLeavingServerId] = useState<string | null>(null)
   const [deletingServerId, setDeletingServerId] = useState<string | null>(null)
+  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null)
   const [sessionToken, setSessionToken] = useState<string | null>(readInitialSessionToken)
   const [freshUser, setFreshUser] = useState<SessionUser | null>(null)
 
@@ -52,6 +62,8 @@ function App() {
   const login = useMutation(loginMutation)
   const logout = useMutation(logoutMutation)
   const createServer = useMutation(createServerMutation)
+  const createChannel = useMutation(createChannelMutation)
+  const deleteChannel = useMutation(deleteChannelMutation)
   const joinServer = useMutation(joinServerMutation)
   const leaveServer = useMutation(leaveServerMutation)
   const deleteServer = useMutation(deleteServerMutation)
@@ -68,6 +80,14 @@ function App() {
     listMyServersQuery,
     activeUser && sessionToken ? { sessionToken } : 'skip',
   )
+  const selectedServer = useMemo(
+    () => myServers?.find((server) => server.id === selectedServerId) ?? null,
+    [myServers, selectedServerId],
+  )
+  const channels = useQuery(
+    listChannelsQuery,
+    activeUser && sessionToken && selectedServerId ? { sessionToken, serverId: selectedServerId } : 'skip',
+  )
 
   useEffect(() => {
     if (!sessionToken || sessionUser !== null) {
@@ -80,6 +100,21 @@ function App() {
     setAuthRoute('login')
   }, [sessionToken, sessionUser])
 
+  useEffect(() => {
+    if (!myServers) {
+      return
+    }
+
+    if (myServers.length === 0) {
+      setSelectedServerId('')
+      return
+    }
+
+    if (!myServers.some((server) => server.id === selectedServerId)) {
+      setSelectedServerId(myServers[0].id)
+    }
+  }, [myServers, selectedServerId])
+
   function persistSession(nextSessionToken: string) {
     setSessionToken(nextSessionToken)
     window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, nextSessionToken)
@@ -88,6 +123,9 @@ function App() {
   function clearLocalSession() {
     setFreshUser(null)
     setSessionToken(null)
+    setSelectedServerId('')
+    setChannelName('')
+    setChannelErrorMessage(null)
     window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY)
     setAuthRoute('login')
   }
@@ -180,6 +218,65 @@ function App() {
       }
     } finally {
       setIsCreatingServer(false)
+    }
+  }
+
+  async function handleCreateChannel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!sessionToken) {
+      setChannelErrorMessage('You must be logged in to create a channel.')
+      return
+    }
+
+    if (!selectedServerId) {
+      setChannelErrorMessage('Select a server before creating a channel.')
+      return
+    }
+
+    setChannelErrorMessage(null)
+    setIsCreatingChannel(true)
+
+    try {
+      await createChannel({
+        sessionToken,
+        serverId: selectedServerId,
+        name: channelName,
+      })
+      setChannelName('')
+    } catch (error) {
+      if (error instanceof ConvexError && typeof error.data === 'string') {
+        setChannelErrorMessage(error.data)
+      } else {
+        setChannelErrorMessage('Unable to create this channel right now. Please try again.')
+      }
+    } finally {
+      setIsCreatingChannel(false)
+    }
+  }
+
+  async function handleDeleteChannel(channelId: string) {
+    if (!sessionToken) {
+      setChannelErrorMessage('You must be logged in to delete a channel.')
+      return
+    }
+
+    setChannelErrorMessage(null)
+    setDeletingChannelId(channelId)
+
+    try {
+      await deleteChannel({
+        sessionToken,
+        channelId,
+      })
+    } catch (error) {
+      if (error instanceof ConvexError && typeof error.data === 'string') {
+        setChannelErrorMessage(error.data)
+      } else {
+        setChannelErrorMessage('Unable to delete this channel right now. Please try again.')
+      }
+    } finally {
+      setDeletingChannelId(null)
     }
   }
 
@@ -372,6 +469,96 @@ function App() {
                           className="mt-2 inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
                         >
                           {deletingServerId === server.id ? 'Deleting...' : 'Delete server'}
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section aria-label="Channels" className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-700">Channels</h2>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Selected server</span>
+                <select
+                  value={selectedServerId}
+                  onChange={(event) => {
+                    setSelectedServerId(event.target.value)
+                    setChannelErrorMessage(null)
+                  }}
+                  disabled={!myServers || myServers.length === 0}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  {myServers && myServers.length > 0 ? (
+                    myServers.map((server) => (
+                      <option key={server.id} value={server.id}>
+                        {server.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No servers available</option>
+                  )}
+                </select>
+              </label>
+
+              <form className="space-y-3" onSubmit={handleCreateChannel}>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">New channel name</span>
+                  <input
+                    type="text"
+                    name="channelName"
+                    value={channelName}
+                    onChange={(event) => setChannelName(event.target.value)}
+                    required
+                    minLength={1}
+                    maxLength={64}
+                    disabled={!selectedServerId}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
+                    placeholder={selectedServer ? `Create in ${selectedServer.name}` : 'Select a server first'}
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isCreatingChannel || !selectedServerId}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
+                >
+                  {isCreatingChannel ? 'Creating channel...' : 'Create channel'}
+                </button>
+              </form>
+
+              {channelErrorMessage ? <p className="text-sm text-red-600">{channelErrorMessage}</p> : null}
+
+              {!selectedServerId ? (
+                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                  Select a server to view its channels.
+                </p>
+              ) : channels === undefined ? (
+                <p className="text-sm text-slate-500">Loading channels...</p>
+              ) : channels.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                  No channels in this server yet.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {channels.map((channel) => (
+                    <li
+                      key={channel.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium"># {channel.name}</p>
+                      </div>
+                      {channel.canDelete ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteChannel(channel.id)}
+                          disabled={deletingChannelId === channel.id}
+                          className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
+                        >
+                          {deletingChannelId === channel.id ? 'Deleting...' : 'Delete'}
                         </button>
                       ) : null}
                     </li>

@@ -39,3 +39,9 @@
 - Pitfall: Related data cleanup can be missed; deleting `serverMemberships` before deleting the server avoids orphaned membership records.
 - Decision: Define this story's delete behavior as hard-delete for server + memberships (channels/messages are deferred until those tables exist).
 - Reuse: For future cascading deletes, implement cleanup in Convex mutations where authorization and relational teardown can be enforced together.
+
+## 2026-02-10 - US-008
+- Worked: Modeling channels with a server-scoped uniqueness index and membership-gated Convex queries provided realtime updates without extra client cache logic.
+- Pitfall: Channel permissions need explicit rule boundaries; allowing delete only for server owners or channel creators keeps moderation behavior predictable for MVP.
+- Decision: Keep channel creation open to any server member while enforcing list/create/delete authorization in Convex.
+- Reuse: Drive channel UI from selected server state and let Convex realtime queries handle create/delete refresh automatically.
