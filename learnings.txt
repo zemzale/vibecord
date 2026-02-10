@@ -1,0 +1,5 @@
+## 2026-02-10 - US-001
+- Worked: Scaffolding Vite + TypeScript in a temp folder and syncing to repo root avoided non-empty directory setup failures.
+- Pitfall: `bun create vite .` cancelled in a non-empty directory, so direct in-place scaffolding was unreliable.
+- Decision: Keep Convex connected at the frontend provider/client layer first, then initialize cloud deployment with `bunx convex dev` when credentials are available.
+- Reuse: For future stories, use Bun scripts (`typecheck`, `test`, `build`) as the stable validation baseline before feature-level checks.

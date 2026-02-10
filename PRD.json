@@ -32,8 +32,8 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
-      "status": "unstarted"
+      "passes": true,
+      "status": "completed"
     },
     {
       "id": "US-002",
