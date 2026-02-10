@@ -1,0 +1,207 @@
+{
+  "project": "VibeCord",
+  "branchName": "azemzale/vibecord-mvp-foundation",
+  "description": "VibeCord MVP - Discord-like chat app with login, servers, channels, and realtime messaging using Vite + TanStack Start + Tailwind + Convex + Bun + TypeScript.",
+  "schema": {
+    "userStoryRequiredKeys": [
+      "id",
+      "title",
+      "description",
+      "acceptanceCriteria",
+      "priority",
+      "passes",
+      "status"
+    ],
+    "userStoryStatusEnum": [
+      "unstarted",
+      "in-progress",
+      "blocked",
+      "completed"
+    ]
+  },
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Bootstrap project foundation",
+      "description": "As a developer, I need a clean TypeScript-first project setup so feature work is consistent and fast.",
+      "acceptanceCriteria": [
+        "Initialize app with Vite + TanStack Start + TypeScript",
+        "Configure Tailwind CSS and confirm styles render",
+        "Set up Convex project and connect frontend to backend",
+        "Use Bun for install and script execution",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-002",
+      "title": "Create account with loginName/password",
+      "description": "As a visitor, I want to create an account with a login name and password so I can access the app.",
+      "acceptanceCriteria": [
+        "Register page supports loginName + password",
+        "Register mutation creates user record in Convex",
+        "Password is stored as secure hash (not plain text)",
+        "Duplicate loginName is rejected with clear error",
+        "Successful registration creates authenticated session",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-003",
+      "title": "Login and logout",
+      "description": "As a returning user, I want to login and logout securely.",
+      "acceptanceCriteria": [
+        "Login page authenticates loginName + password",
+        "Invalid credentials return safe generic error",
+        "Session is persisted and checked on protected routes",
+        "Logout clears session and redirects to login",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-004",
+      "title": "Social auth extension points",
+      "description": "As a product owner, I want the auth architecture ready for Google/GitHub/social providers later without rewriting core auth.",
+      "acceptanceCriteria": [
+        "Login/register UI shows social provider placeholders",
+        "Data model includes provider account linking shape",
+        "Auth boundaries allow future OAuth integration",
+        "No working OAuth flow required in MVP",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-005",
+      "title": "Create and list servers",
+      "description": "As an authenticated user, I want to create servers and see my server list.",
+      "acceptanceCriteria": [
+        "User can create server with a name",
+        "Server creator is stored as owner",
+        "Created server appears in server list immediately",
+        "Only authenticated users can create/list servers",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-006",
+      "title": "Join and leave servers",
+      "description": "As a user, I want to join or leave servers so I can manage communities I belong to.",
+      "acceptanceCriteria": [
+        "User can join server by server id or invite placeholder flow",
+        "Joined servers appear in user's server list",
+        "User can leave server they are a member of",
+        "Server membership checks enforced in Convex",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-007",
+      "title": "Delete server",
+      "description": "As a server owner, I want to delete my server when it is no longer needed.",
+      "acceptanceCriteria": [
+        "Server owner can delete server",
+        "Non-owner cannot delete server",
+        "Deleting server removes or archives related channels/messages according to defined behavior",
+        "UI updates to remove deleted server from lists",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-008",
+      "title": "Create and delete channels",
+      "description": "As a server member with permission, I want to create and delete channels to organize topics.",
+      "acceptanceCriteria": [
+        "Create channel within selected server",
+        "Delete channel with permission checks",
+        "Only server members can list channels",
+        "Channel list updates in realtime",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-009",
+      "title": "Send messages in channels",
+      "description": "As a server member, I want to send messages in a channel chat.",
+      "acceptanceCriteria": [
+        "Message input sends message to selected channel",
+        "Message list renders author, content, and timestamp",
+        "Messages are displayed in chronological order",
+        "Only channel-accessible members can send/read messages",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-010",
+      "title": "Delete messages",
+      "description": "As a user, I want to delete my messages (and allow moderation rules) to manage chat content.",
+      "acceptanceCriteria": [
+        "Message author can delete their own message",
+        "Server owner/admin override behavior is defined and enforced",
+        "Deleted messages are removed or marked deleted per chosen UX",
+        "Unauthorized delete attempts are rejected",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-011",
+      "title": "Build app shell and route flow",
+      "description": "As an authenticated user, I want a clear interface to navigate servers, channels, and chat.",
+      "acceptanceCriteria": [
+        "Routes include /login, /register, and authenticated app routes",
+        "Authenticated shell includes server list, channel list, and chat pane",
+        "Route parameters drive selected server and channel",
+        "Empty states for no servers/channels/messages",
+        "Layout works on desktop and mobile",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-012",
+      "title": "Authorization and security baseline",
+      "description": "As a product owner, I need baseline security so user and server data stays protected.",
+      "acceptanceCriteria": [
+        "All protected Convex mutations/queries enforce auth checks",
+        "Membership checks exist for server/channel/message access",
+        "Session tokens are stored securely (hashed or equivalent)",
+        "Input validation exists for all public mutations",
+        "Basic login/register rate limiting strategy defined and implemented or documented",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "status": "unstarted"
+    }
+  ]
+}
