@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values'
-import { mutation, query } from './_generated/server'
+import { mutation, query, type MutationCtx } from './_generated/server'
+import type { Id } from './_generated/dataModel'
 
 const HASH_ITERATIONS = 120_000
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
@@ -14,10 +15,14 @@ function randomHex(byteLength: number): string {
   return bytesToHex(bytes)
 }
 
+function hexToBytes(hex: string): Uint8Array {
+  return new Uint8Array(hex.match(/.{1,2}/g)?.map((pair) => Number.parseInt(pair, 16)) ?? [])
+}
+
 async function derivePasswordHash(password: string, saltHex: string): Promise<string> {
   const encoder = new TextEncoder()
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits'])
-  const salt = new Uint8Array(saltHex.match(/.{1,2}/g)?.map((pair) => Number.parseInt(pair, 16)) ?? [])
+  const salt = hexToBytes(saltHex)
 
   const bits = await crypto.subtle.deriveBits(
     {
@@ -31,6 +36,38 @@ async function derivePasswordHash(password: string, saltHex: string): Promise<st
   )
 
   return bytesToHex(new Uint8Array(bits))
+}
+
+function constantTimeEqual(leftHex: string, rightHex: string): boolean {
+  if (leftHex.length !== rightHex.length) {
+    return false
+  }
+
+  const left = hexToBytes(leftHex)
+  const right = hexToBytes(rightHex)
+  let mismatch = 0
+
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left[index] ^ right[index]
+  }
+
+  return mismatch === 0
+}
+
+async function createSession(ctx: MutationCtx, userId: Id<'users'>) {
+  const sessionToken = randomHex(32)
+  const tokenHash = await sha256Hex(sessionToken)
+  const createdAt = Date.now()
+  const expiresAt = createdAt + SESSION_TTL_MS
+
+  await ctx.db.insert('sessions', {
+    userId,
+    tokenHash,
+    createdAt,
+    expiresAt,
+  })
+
+  return sessionToken
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -85,16 +122,7 @@ export const register = mutation({
       createdAt,
     })
 
-    const sessionToken = randomHex(32)
-    const tokenHash = await sha256Hex(sessionToken)
-    const expiresAt = createdAt + SESSION_TTL_MS
-
-    await ctx.db.insert('sessions', {
-      userId,
-      tokenHash,
-      createdAt,
-      expiresAt,
-    })
+    const sessionToken = await createSession(ctx, userId)
 
     return {
       sessionToken,
@@ -103,6 +131,64 @@ export const register = mutation({
         loginName: display,
       },
     }
+  },
+})
+
+export const login = mutation({
+  args: {
+    loginName: v.string(),
+    password: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { normalized } = normalizeLoginName(args.loginName)
+    const password = args.password.trim()
+
+    if (normalized.length < 3 || password.length < 8) {
+      throw new ConvexError('Invalid login credentials.')
+    }
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_login_name_lower', (q) => q.eq('loginNameLower', normalized))
+      .unique()
+
+    if (!user) {
+      throw new ConvexError('Invalid login credentials.')
+    }
+
+    const candidateHash = await derivePasswordHash(password, user.passwordSalt)
+    if (!constantTimeEqual(candidateHash, user.passwordHash)) {
+      throw new ConvexError('Invalid login credentials.')
+    }
+
+    const sessionToken = await createSession(ctx, user._id)
+
+    return {
+      sessionToken,
+      user: {
+        id: user._id,
+        loginName: user.loginName,
+      },
+    }
+  },
+})
+
+export const logout = mutation({
+  args: {
+    sessionToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const tokenHash = await sha256Hex(args.sessionToken)
+    const session = await ctx.db
+      .query('sessions')
+      .withIndex('by_token_hash', (q) => q.eq('tokenHash', tokenHash))
+      .unique()
+
+    if (session) {
+      await ctx.db.delete(session._id)
+    }
+
+    return { ok: true }
   },
 })
 

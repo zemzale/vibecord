@@ -17,6 +17,28 @@ export const registerMutation = makeFunctionReference<
   }
 >('auth:register')
 
+export const loginMutation = makeFunctionReference<
+  'mutation',
+  {
+    loginName: string
+    password: string
+  },
+  {
+    sessionToken: string
+    user: SessionUser
+  }
+>('auth:login')
+
+export const logoutMutation = makeFunctionReference<
+  'mutation',
+  {
+    sessionToken: string
+  },
+  {
+    ok: boolean
+  }
+>('auth:logout')
+
 export const getSessionUserQuery = makeFunctionReference<
   'query',
   {
