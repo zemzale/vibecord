@@ -51,3 +51,9 @@
 - Pitfall: Introducing messages requires delete-path cleanup; channel/server deletion now needs message cascading to avoid orphaned rows.
 - Decision: Enforce channel access by re-checking server ownership/membership for both `sendMessage` and `listMessages` to keep read/write authorization symmetric.
 - Reuse: For future chat features (edits/deletes), return enriched message view models (author + timestamp) directly from Convex queries to keep UI logic thin.
+
+## 2026-02-10 - US-010
+- Worked: A dedicated `deleteMessage` Convex mutation plus per-message `canDelete` metadata enabled immediate UI updates through existing realtime queries.
+- Pitfall: Delete permissions need explicit moderator behavior; without an admin role in MVP, ownership override must be codified server-side.
+- Decision: Define moderation override as server owner can delete any message, while message authors can always delete their own.
+- Reuse: For future moderation features, compute UI capabilities (`canDelete`) in Convex view models so the client stays permission-thin and consistent.

@@ -37,6 +37,7 @@ async function requireChannelAccess(
 ): Promise<{
   channelId: Id<'channels'>
   serverId: Id<'servers'>
+  serverOwnerId: Id<'users'>
 }> {
   const channel = await ctx.db.get(channelId)
   if (!channel) {
@@ -62,7 +63,16 @@ async function requireChannelAccess(
   return {
     channelId: channel._id,
     serverId: channel.serverId,
+    serverOwnerId: server.ownerId,
   }
+}
+
+function canDeleteMessage(
+  actorId: Id<'users'>,
+  serverOwnerId: Id<'users'>,
+  authorId: Id<'users'>,
+): boolean {
+  return actorId === authorId || actorId === serverOwnerId
 }
 
 export const sendMessage = mutation({
@@ -96,6 +106,7 @@ export const sendMessage = mutation({
       authorLoginName: author?.loginName ?? 'Unknown user',
       content,
       createdAt,
+      canDelete: true,
     }
   },
 })
@@ -107,7 +118,7 @@ export const listMessages = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthenticatedUser(ctx, args.sessionToken)
-    const { channelId } = await requireChannelAccess(ctx, args.channelId, userId)
+    const { channelId, serverOwnerId } = await requireChannelAccess(ctx, args.channelId, userId)
 
     const messages = await ctx.db
       .query('messages')
@@ -123,6 +134,34 @@ export const listMessages = query({
       authorLoginName: authors[index]?.loginName ?? 'Unknown user',
       content: message.content,
       createdAt: message.createdAt,
+      canDelete: canDeleteMessage(userId, serverOwnerId, message.authorId),
     }))
+  },
+})
+
+export const deleteMessage = mutation({
+  args: {
+    sessionToken: v.string(),
+    messageId: v.id('messages'),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthenticatedUser(ctx, args.sessionToken)
+    const message = await ctx.db.get(args.messageId)
+
+    if (!message) {
+      throw new ConvexError('Message not found.')
+    }
+
+    const { serverOwnerId } = await requireChannelAccess(ctx, message.channelId, userId)
+
+    if (!canDeleteMessage(userId, serverOwnerId, message.authorId)) {
+      throw new ConvexError('You do not have permission to delete this message.')
+    }
+
+    await ctx.db.delete(message._id)
+
+    return {
+      id: message._id,
+    }
   },
 })

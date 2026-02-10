@@ -22,7 +22,7 @@ import {
   deleteChannelMutation,
   listChannelsQuery,
 } from './lib/channels'
-import { listMessagesQuery, sendMessageMutation } from './lib/messages'
+import { deleteMessageMutation, listMessagesQuery, sendMessageMutation } from './lib/messages'
 
 type AuthRoute = 'login' | 'register'
 
@@ -60,6 +60,7 @@ function App() {
   const [leavingServerId, setLeavingServerId] = useState<string | null>(null)
   const [deletingServerId, setDeletingServerId] = useState<string | null>(null)
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null)
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
   const [sessionToken, setSessionToken] = useState<string | null>(readInitialSessionToken)
   const [freshUser, setFreshUser] = useState<SessionUser | null>(null)
 
@@ -69,6 +70,7 @@ function App() {
   const createServer = useMutation(createServerMutation)
   const createChannel = useMutation(createChannelMutation)
   const sendMessage = useMutation(sendMessageMutation)
+  const deleteMessage = useMutation(deleteMessageMutation)
   const deleteChannel = useMutation(deleteChannelMutation)
   const joinServer = useMutation(joinServerMutation)
   const leaveServer = useMutation(leaveServerMutation)
@@ -343,6 +345,31 @@ function App() {
       }
     } finally {
       setIsSendingMessage(false)
+    }
+  }
+
+  async function handleDeleteMessage(messageId: string) {
+    if (!sessionToken) {
+      setMessageErrorMessage('You must be logged in to delete messages.')
+      return
+    }
+
+    setMessageErrorMessage(null)
+    setDeletingMessageId(messageId)
+
+    try {
+      await deleteMessage({
+        sessionToken,
+        messageId,
+      })
+    } catch (error) {
+      if (error instanceof ConvexError && typeof error.data === 'string') {
+        setMessageErrorMessage(error.data)
+      } else {
+        setMessageErrorMessage('Unable to delete this message right now. Please try again.')
+      }
+    } finally {
+      setDeletingMessageId(null)
     }
   }
 
@@ -697,13 +724,25 @@ function App() {
                           key={message.id}
                           className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
                         >
-                          <div className="flex items-baseline justify-between gap-3">
-                            <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
-                              {message.authorLoginName}
-                            </p>
-                            <p className="shrink-0 text-xs text-slate-500">
-                              {new Date(message.createdAt).toLocaleString()}
-                            </p>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                {message.authorLoginName}
+                              </p>
+                              <p className="shrink-0 text-xs text-slate-500">
+                                {new Date(message.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            {message.canDelete ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteMessage(message.id)}
+                                disabled={deletingMessageId === message.id}
+                                className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
+                              >
+                                {deletingMessageId === message.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            ) : null}
                           </div>
                           <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
                         </li>

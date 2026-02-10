@@ -7,6 +7,11 @@ export type MessageRecord = {
   authorLoginName: string
   content: string
   createdAt: number
+  canDelete: boolean
+}
+
+export type DeletedMessageRecord = {
+  id: string
 }
 
 export const sendMessageMutation = makeFunctionReference<
@@ -27,3 +32,12 @@ export const listMessagesQuery = makeFunctionReference<
   },
   Array<MessageRecord>
 >('messages:listMessages')
+
+export const deleteMessageMutation = makeFunctionReference<
+  'mutation',
+  {
+    sessionToken: string
+    messageId: string
+  },
+  DeletedMessageRecord
+>('messages:deleteMessage')
