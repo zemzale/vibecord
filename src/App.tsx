@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useMutation, useQuery } from 'convex/react'
 import { ConvexError } from 'convex/values'
+import { useMutation, useQuery } from 'convex/react'
 import {
   getSessionUserQuery,
   loginMutation,
   logoutMutation,
   registerMutation,
-  SOCIAL_AUTH_PROVIDERS,
   SESSION_TOKEN_STORAGE_KEY,
+  SOCIAL_AUTH_PROVIDERS,
   type SessionUser,
 } from './lib/auth'
 import {
@@ -24,7 +24,18 @@ import {
 } from './lib/channels'
 import { deleteMessageMutation, listMessagesQuery, sendMessageMutation } from './lib/messages'
 
-type AuthRoute = 'login' | 'register'
+type AppRoute =
+  | { kind: 'login' }
+  | { kind: 'register' }
+  | {
+      kind: 'app'
+      serverId: string | null
+      channelId: string | null
+    }
+
+const LOGIN_PATH = '/login'
+const REGISTER_PATH = '/register'
+const APP_PATH = '/app'
 
 function readInitialSessionToken(): string | null {
   if (typeof window === 'undefined') {
@@ -35,15 +46,79 @@ function readInitialSessionToken(): string | null {
   return token && token.length > 0 ? token : null
 }
 
+function safeDecodePathSegment(value: string | undefined): string | null {
+  if (!value) {
+    return null
+  }
+
+  try {
+    const decoded = decodeURIComponent(value)
+    return decoded.length > 0 ? decoded : null
+  } catch {
+    return null
+  }
+}
+
+function parseRoute(pathname: string): AppRoute {
+  if (pathname === REGISTER_PATH) {
+    return { kind: 'register' }
+  }
+
+  if (pathname === LOGIN_PATH || pathname === '/') {
+    return { kind: 'login' }
+  }
+
+  const parts = pathname.split('/').filter((part) => part.length > 0)
+  if (parts.length === 0 || parts[0] !== 'app') {
+    return { kind: 'login' }
+  }
+
+  if (parts.length === 1) {
+    return { kind: 'app', serverId: null, channelId: null }
+  }
+
+  if (parts.length === 3 && parts[1] === 'servers') {
+    return {
+      kind: 'app',
+      serverId: safeDecodePathSegment(parts[2]),
+      channelId: null,
+    }
+  }
+
+  if (parts.length === 5 && parts[1] === 'servers' && parts[3] === 'channels') {
+    return {
+      kind: 'app',
+      serverId: safeDecodePathSegment(parts[2]),
+      channelId: safeDecodePathSegment(parts[4]),
+    }
+  }
+
+  return { kind: 'app', serverId: null, channelId: null }
+}
+
+function createAppPath(serverId: string | null, channelId: string | null): string {
+  if (!serverId) {
+    return APP_PATH
+  }
+
+  const encodedServerId = encodeURIComponent(serverId)
+  if (!channelId) {
+    return `${APP_PATH}/servers/${encodedServerId}`
+  }
+
+  const encodedChannelId = encodeURIComponent(channelId)
+  return `${APP_PATH}/servers/${encodedServerId}/channels/${encodedChannelId}`
+}
+
 function App() {
-  const [authRoute, setAuthRoute] = useState<AuthRoute>('login')
+  const [pathname, setPathname] = useState(() =>
+    typeof window === 'undefined' ? LOGIN_PATH : window.location.pathname,
+  )
   const [loginName, setLoginName] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverName, setServerName] = useState('')
-  const [selectedServerId, setSelectedServerId] = useState('')
-  const [selectedChannelId, setSelectedChannelId] = useState('')
   const [channelName, setChannelName] = useState('')
   const [messageContent, setMessageContent] = useState('')
   const [joinServerId, setJoinServerId] = useState('')
@@ -75,11 +150,12 @@ function App() {
   const joinServer = useMutation(joinServerMutation)
   const leaveServer = useMutation(leaveServerMutation)
   const deleteServer = useMutation(deleteServerMutation)
-  const sessionUser = useQuery(
-    getSessionUserQuery,
-    sessionToken ? { sessionToken } : 'skip',
-  )
 
+  const route = useMemo(() => parseRoute(pathname), [pathname])
+  const selectedServerId = route.kind === 'app' ? route.serverId : null
+  const selectedChannelId = route.kind === 'app' ? route.channelId : null
+
+  const sessionUser = useQuery(getSessionUserQuery, sessionToken ? { sessionToken } : 'skip')
   const activeUser = useMemo(
     () => (sessionUser === undefined ? freshUser : sessionUser),
     [freshUser, sessionUser],
@@ -105,6 +181,40 @@ function App() {
     activeUser && sessionToken && selectedChannelId ? { sessionToken, channelId: selectedChannelId } : 'skip',
   )
 
+  function navigate(nextPath: string, options?: { replace?: boolean }) {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const currentPath = window.location.pathname
+    if (currentPath === nextPath) {
+      return
+    }
+
+    if (options?.replace) {
+      window.history.replaceState(null, '', nextPath)
+    } else {
+      window.history.pushState(null, '', nextPath)
+    }
+
+    setPathname(window.location.pathname)
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const handlePopState = () => {
+      setPathname(window.location.pathname)
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
   useEffect(() => {
     if (!sessionToken || sessionUser !== null) {
       return
@@ -113,38 +223,71 @@ function App() {
     setFreshUser(null)
     setSessionToken(null)
     window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY)
-    setAuthRoute('login')
+    navigate(LOGIN_PATH, { replace: true })
   }, [sessionToken, sessionUser])
 
   useEffect(() => {
+    if (!activeUser) {
+      if (route.kind === 'app') {
+        navigate(LOGIN_PATH, { replace: true })
+      }
+      return
+    }
+
+    if (route.kind !== 'app') {
+      navigate(APP_PATH, { replace: true })
+    }
+  }, [activeUser, route])
+
+  useEffect(() => {
+    if (!activeUser || route.kind !== 'app') {
+      return
+    }
+
     if (!myServers) {
       return
     }
 
     if (myServers.length === 0) {
-      setSelectedServerId('')
+      if (route.serverId || route.channelId) {
+        navigate(APP_PATH, { replace: true })
+      }
       return
     }
 
-    if (!myServers.some((server) => server.id === selectedServerId)) {
-      setSelectedServerId(myServers[0].id)
+    const hasServerSelection = route.serverId
+      ? myServers.some((server) => server.id === route.serverId)
+      : false
+    if (!hasServerSelection) {
+      navigate(createAppPath(myServers[0].id, null), { replace: true })
+      return
     }
-  }, [myServers, selectedServerId])
+  }, [activeUser, myServers, route])
 
   useEffect(() => {
+    if (!activeUser || route.kind !== 'app' || !route.serverId) {
+      return
+    }
+
     if (!channels) {
       return
     }
 
     if (channels.length === 0) {
-      setSelectedChannelId('')
+      if (route.channelId) {
+        navigate(createAppPath(route.serverId, null), { replace: true })
+      }
       return
     }
 
-    if (!channels.some((channel) => channel.id === selectedChannelId)) {
-      setSelectedChannelId(channels[0].id)
+    const hasChannelSelection = route.channelId
+      ? channels.some((channel) => channel.id === route.channelId)
+      : false
+
+    if (!hasChannelSelection) {
+      navigate(createAppPath(route.serverId, channels[0].id), { replace: true })
     }
-  }, [channels, selectedChannelId])
+  }, [activeUser, channels, route])
 
   function persistSession(nextSessionToken: string) {
     setSessionToken(nextSessionToken)
@@ -154,14 +297,12 @@ function App() {
   function clearLocalSession() {
     setFreshUser(null)
     setSessionToken(null)
-    setSelectedServerId('')
-    setSelectedChannelId('')
     setChannelName('')
     setChannelErrorMessage(null)
     setMessageContent('')
     setMessageErrorMessage(null)
     window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY)
-    setAuthRoute('login')
+    navigate(LOGIN_PATH, { replace: true })
   }
 
   async function handleRegisterSubmit(event: FormEvent<HTMLFormElement>) {
@@ -179,6 +320,7 @@ function App() {
       persistSession(result.sessionToken)
       setLoginName('')
       setPassword('')
+      navigate(APP_PATH, { replace: true })
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string') {
         setErrorMessage(error.data)
@@ -205,6 +347,7 @@ function App() {
       persistSession(result.sessionToken)
       setLoginName('')
       setPassword('')
+      navigate(APP_PATH, { replace: true })
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string') {
         setErrorMessage(error.data)
@@ -239,11 +382,12 @@ function App() {
     setIsCreatingServer(true)
 
     try {
-      await createServer({
+      const server = await createServer({
         sessionToken,
         name: serverName,
       })
       setServerName('')
+      navigate(createAppPath(server.id, null))
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string') {
         setServerErrorMessage(error.data)
@@ -272,12 +416,13 @@ function App() {
     setIsCreatingChannel(true)
 
     try {
-      await createChannel({
+      const channel = await createChannel({
         sessionToken,
         serverId: selectedServerId,
         name: channelName,
       })
       setChannelName('')
+      navigate(createAppPath(selectedServerId, channel.id))
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string') {
         setChannelErrorMessage(error.data)
@@ -387,11 +532,12 @@ function App() {
     setIsJoiningServer(true)
 
     try {
-      await joinServer({
+      const server = await joinServer({
         sessionToken,
         serverId: joinServerId.trim(),
       })
       setJoinServerId('')
+      navigate(createAppPath(server.id, null))
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string') {
         setJoinServerErrorMessage(error.data)
@@ -419,6 +565,10 @@ function App() {
         sessionToken,
         serverId,
       })
+
+      if (selectedServerId === serverId) {
+        navigate(APP_PATH)
+      }
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string') {
         setLeaveServerErrorMessage(error.data)
@@ -446,6 +596,10 @@ function App() {
         sessionToken,
         serverId,
       })
+
+      if (selectedServerId === serverId) {
+        navigate(APP_PATH)
+      }
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string') {
         setDeleteServerErrorMessage(error.data)
@@ -457,16 +611,27 @@ function App() {
     }
   }
 
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-10 text-slate-900">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight">VibeCord</h1>
+  const isAuthPage = route.kind === 'login' || route.kind === 'register'
 
-        {activeUser ? (
-          <div className="mt-4 space-y-4">
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              Signed in as <span className="font-semibold">{activeUser.loginName}</span>
-            </p>
+  return (
+    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
+      {activeUser && route.kind === 'app' ? (
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 lg:grid lg:grid-cols-[20rem_22rem_minmax(0,1fr)] lg:items-start">
+          <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div>
+                <h1 className="text-xl font-semibold tracking-tight">VibeCord</h1>
+                <p className="text-xs text-slate-500">Signed in as {activeUser.loginName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Logout
+              </button>
+            </div>
+
             <form className="space-y-3" onSubmit={handleCreateServer}>
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-slate-700">New server name</span>
@@ -493,7 +658,7 @@ function App() {
               </button>
             </form>
 
-            <form className="space-y-3" onSubmit={handleJoinServer}>
+            <form className="mt-4 space-y-3" onSubmit={handleJoinServer}>
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-slate-700">Join server by ID</span>
                 <input
@@ -518,10 +683,10 @@ function App() {
               </button>
             </form>
 
-            {leaveServerErrorMessage ? <p className="text-sm text-red-600">{leaveServerErrorMessage}</p> : null}
-            {deleteServerErrorMessage ? <p className="text-sm text-red-600">{deleteServerErrorMessage}</p> : null}
+            {leaveServerErrorMessage ? <p className="mt-4 text-sm text-red-600">{leaveServerErrorMessage}</p> : null}
+            {deleteServerErrorMessage ? <p className="mt-2 text-sm text-red-600">{deleteServerErrorMessage}</p> : null}
 
-            <section aria-label="My servers" className="space-y-2">
+            <section aria-label="My servers" className="mt-4 space-y-2">
               <h2 className="text-sm font-semibold text-slate-700">My servers</h2>
               {myServers === undefined ? (
                 <p className="text-sm text-slate-500">Loading servers...</p>
@@ -531,324 +696,337 @@ function App() {
                 </p>
               ) : (
                 <ul className="space-y-2">
-                  {myServers.map((server) => (
-                    <li
-                      key={server.id}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{server.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">ID: {server.id}</p>
-                        </div>
-                        <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600">
-                          {server.membershipRole === 'owner' ? 'Owner' : 'Member'}
-                        </span>
-                      </div>
-                      {server.membershipRole === 'member' ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleLeaveServer(server.id)}
-                          disabled={leavingServerId === server.id}
-                          className="mt-2 inline-flex items-center rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
-                        >
-                          {leavingServerId === server.id ? 'Leaving...' : 'Leave server'}
-                        </button>
-                      ) : server.membershipRole === 'owner' ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteServer(server.id)}
-                          disabled={deletingServerId === server.id}
-                          className="mt-2 inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
-                        >
-                          {deletingServerId === server.id ? 'Deleting...' : 'Delete server'}
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                  {myServers.map((server) => {
+                    const isSelected = selectedServerId === server.id
 
-            <section aria-label="Channels" className="space-y-3">
-              <h2 className="text-sm font-semibold text-slate-700">Channels</h2>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Selected server</span>
-                <select
-                  value={selectedServerId}
-                  onChange={(event) => {
-                    setSelectedServerId(event.target.value)
-                    setSelectedChannelId('')
-                    setChannelErrorMessage(null)
-                    setMessageErrorMessage(null)
-                  }}
-                  disabled={!myServers || myServers.length === 0}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
-                >
-                  {myServers && myServers.length > 0 ? (
-                    myServers.map((server) => (
-                      <option key={server.id} value={server.id}>
-                        {server.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">No servers available</option>
-                  )}
-                </select>
-              </label>
-
-              <form className="space-y-3" onSubmit={handleCreateChannel}>
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">New channel name</span>
-                  <input
-                    type="text"
-                    name="channelName"
-                    value={channelName}
-                    onChange={(event) => setChannelName(event.target.value)}
-                    required
-                    minLength={1}
-                    maxLength={64}
-                    disabled={!selectedServerId}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
-                    placeholder={selectedServer ? `Create in ${selectedServer.name}` : 'Select a server first'}
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={isCreatingChannel || !selectedServerId}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  {isCreatingChannel ? 'Creating channel...' : 'Create channel'}
-                </button>
-              </form>
-
-              {channelErrorMessage ? <p className="text-sm text-red-600">{channelErrorMessage}</p> : null}
-
-              {!selectedServerId ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                  Select a server to view its channels.
-                </p>
-              ) : channels === undefined ? (
-                <p className="text-sm text-slate-500">Loading channels...</p>
-              ) : channels.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                  No channels in this server yet.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {channels.map((channel) => (
-                    <li
-                      key={channel.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedChannelId(channel.id)
-                          setMessageErrorMessage(null)
-                        }}
-                        className="min-w-0 flex-1 text-left"
+                    return (
+                      <li
+                        key={server.id}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
                       >
-                        <p className="truncate font-medium"># {channel.name}</p>
-                        {selectedChannelId === channel.id ? (
-                          <p className="text-xs text-slate-500">Selected channel</p>
-                        ) : null}
-                      </button>
-                      {channel.canDelete ? (
                         <button
                           type="button"
-                          onClick={() => void handleDeleteChannel(channel.id)}
-                          disabled={deletingChannelId === channel.id}
-                          className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
-                        >
-                          {deletingChannelId === channel.id ? 'Deleting...' : 'Delete'}
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section aria-label="Messages" className="space-y-3">
-              <h2 className="text-sm font-semibold text-slate-700">Messages</h2>
-
-              {!selectedChannelId ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                  Select a channel to read and send messages.
-                </p>
-              ) : (
-                <>
-                  <p className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                    Chatting in <span className="font-semibold"># {selectedChannel?.name ?? 'Unknown channel'}</span>
-                  </p>
-
-                  <form className="space-y-3" onSubmit={handleSendMessage}>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-slate-700">Message</span>
-                      <textarea
-                        name="messageContent"
-                        value={messageContent}
-                        onChange={(event) => setMessageContent(event.target.value)}
-                        required
-                        minLength={1}
-                        maxLength={2000}
-                        rows={3}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
-                        placeholder="Write a message"
-                      />
-                    </label>
-                    <button
-                      type="submit"
-                      disabled={isSendingMessage}
-                      className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
-                    >
-                      {isSendingMessage ? 'Sending...' : 'Send message'}
-                    </button>
-                  </form>
-
-                  {messageErrorMessage ? <p className="text-sm text-red-600">{messageErrorMessage}</p> : null}
-
-                  {messages === undefined ? (
-                    <p className="text-sm text-slate-500">Loading messages...</p>
-                  ) : messages.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                      No messages yet. Start the conversation.
-                    </p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {messages.map((message) => (
-                        <li
-                          key={message.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                          onClick={() => {
+                            setChannelErrorMessage(null)
+                            setMessageErrorMessage(null)
+                            navigate(createAppPath(server.id, null))
+                          }}
+                          className="w-full text-left"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                {message.authorLoginName}
-                              </p>
-                              <p className="shrink-0 text-xs text-slate-500">
-                                {new Date(message.createdAt).toLocaleString()}
-                              </p>
+                              <p className="truncate font-medium">{server.name}</p>
+                              <p className="mt-1 text-xs text-slate-500">ID: {server.id}</p>
+                              {isSelected ? <p className="mt-1 text-xs text-slate-500">Selected server</p> : null}
                             </div>
-                            {message.canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteMessage(message.id)}
-                                disabled={deletingMessageId === message.id}
-                                className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
-                              >
-                                {deletingMessageId === message.id ? 'Deleting...' : 'Delete'}
-                              </button>
-                            ) : null}
+                            <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600">
+                              {server.membershipRole === 'owner' ? 'Owner' : 'Member'}
+                            </span>
                           </div>
-                          <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
+                        </button>
+
+                        {server.membershipRole === 'member' ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleLeaveServer(server.id)}
+                            disabled={leavingServerId === server.id}
+                            className="mt-2 inline-flex items-center rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                          >
+                            {leavingServerId === server.id ? 'Leaving...' : 'Leave server'}
+                          </button>
+                        ) : server.membershipRole === 'owner' ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteServer(server.id)}
+                            disabled={deletingServerId === server.id}
+                            className="mt-2 inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
+                          >
+                            {deletingServerId === server.id ? 'Deleting...' : 'Delete server'}
+                          </button>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </section>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Logout
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="mt-2 text-sm text-slate-600">
-              {authRoute === 'login' ? 'Login to access your account.' : 'Create your account to continue.'}
-            </p>
+          </aside>
 
-            <div className="mt-4 space-y-2" aria-label="Social sign-in providers">
-              {SOCIAL_AUTH_PROVIDERS.map((provider) => (
-                <button
-                  key={provider.id}
-                  type="button"
-                  disabled
-                  className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-500"
-                >
-                  {provider.label} (coming soon)
-                </button>
-              ))}
-            </div>
+          <section aria-label="Channels" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-700">Channels</h2>
 
-            <p className="mt-3 text-xs text-slate-500">
-              OAuth providers are planned. Use login name + password for this MVP.
-            </p>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Selected server</span>
+              <select
+                value={selectedServerId ?? ''}
+                onChange={(event) => {
+                  setChannelErrorMessage(null)
+                  setMessageErrorMessage(null)
+                  navigate(createAppPath(event.target.value || null, null))
+                }}
+                disabled={!myServers || myServers.length === 0}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                {myServers && myServers.length > 0 ? (
+                  myServers.map((server) => (
+                    <option key={server.id} value={server.id}>
+                      {server.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No servers available</option>
+                )}
+              </select>
+            </label>
 
-            <form
-              className="mt-6 space-y-4"
-              onSubmit={authRoute === 'login' ? handleLoginSubmit : handleRegisterSubmit}
-            >
+            <form className="mt-4 space-y-3" onSubmit={handleCreateChannel}>
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Login name</span>
+                <span className="mb-1 block text-sm font-medium text-slate-700">New channel name</span>
                 <input
                   type="text"
-                  name="loginName"
-                  autoComplete="username"
-                  value={loginName}
-                  onChange={(event) => setLoginName(event.target.value)}
+                  name="channelName"
+                  value={channelName}
+                  onChange={(event) => setChannelName(event.target.value)}
                   required
-                  minLength={3}
-                  maxLength={24}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+                  minLength={1}
+                  maxLength={64}
+                  disabled={!selectedServerId}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
+                  placeholder={selectedServer ? `Create in ${selectedServer.name}` : 'Select a server first'}
                 />
               </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Password</span>
-                <input
-                  type="password"
-                  name="password"
-                  autoComplete={authRoute === 'login' ? 'current-password' : 'new-password'}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  minLength={8}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
-                />
-              </label>
-
-              {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
 
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+                disabled={isCreatingChannel || !selectedServerId}
+                className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
               >
-                {isSubmitting
-                  ? authRoute === 'login'
-                    ? 'Logging in...'
-                    : 'Creating account...'
-                  : authRoute === 'login'
-                    ? 'Login'
-                    : 'Create account'}
+                {isCreatingChannel ? 'Creating channel...' : 'Create channel'}
               </button>
             </form>
 
-            <p className="mt-4 text-sm text-slate-600">
-              {authRoute === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
+            {channelErrorMessage ? <p className="mt-3 text-sm text-red-600">{channelErrorMessage}</p> : null}
+
+            {!selectedServerId ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                Select a server to view its channels.
+              </p>
+            ) : channels === undefined ? (
+              <p className="mt-3 text-sm text-slate-500">Loading channels...</p>
+            ) : channels.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                No channels in this server yet.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {channels.map((channel) => (
+                  <li
+                    key={channel.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMessageErrorMessage(null)
+                        navigate(createAppPath(selectedServerId, channel.id))
+                      }}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate font-medium"># {channel.name}</p>
+                      {selectedChannelId === channel.id ? (
+                        <p className="text-xs text-slate-500">Selected channel</p>
+                      ) : null}
+                    </button>
+                    {channel.canDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteChannel(channel.id)}
+                        disabled={deletingChannelId === channel.id}
+                        className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
+                      >
+                        {deletingChannelId === channel.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section aria-label="Messages" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-700">Messages</h2>
+
+            {!selectedServerId ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                Select a server to start chatting.
+              </p>
+            ) : !selectedChannelId ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                Select a channel to read and send messages.
+              </p>
+            ) : (
+              <>
+                <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+                  Chatting in <span className="font-semibold"># {selectedChannel?.name ?? 'Unknown channel'}</span>
+                </p>
+
+                <form className="mt-3 space-y-3" onSubmit={handleSendMessage}>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Message</span>
+                    <textarea
+                      name="messageContent"
+                      value={messageContent}
+                      onChange={(event) => setMessageContent(event.target.value)}
+                      required
+                      minLength={1}
+                      maxLength={2000}
+                      rows={3}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+                      placeholder="Write a message"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={isSendingMessage}
+                    className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+                  >
+                    {isSendingMessage ? 'Sending...' : 'Send message'}
+                  </button>
+                </form>
+
+                {messageErrorMessage ? <p className="mt-3 text-sm text-red-600">{messageErrorMessage}</p> : null}
+
+                {messages === undefined ? (
+                  <p className="mt-3 text-sm text-slate-500">Loading messages...</p>
+                ) : messages.length === 0 ? (
+                  <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                    No messages yet. Start the conversation.
+                  </p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {messages.map((message) => (
+                      <li
+                        key={message.id}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
+                              {message.authorLoginName}
+                            </p>
+                            <p className="shrink-0 text-xs text-slate-500">
+                              {new Date(message.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                          {message.canDelete ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteMessage(message.id)}
+                              disabled={deletingMessageId === message.id}
+                              className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
+                            >
+                              {deletingMessageId === message.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      ) : isAuthPage ? (
+        <section className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h1 className="text-2xl font-semibold tracking-tight">VibeCord</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            {route.kind === 'login' ? 'Login to access your account.' : 'Create your account to continue.'}
+          </p>
+
+          <div className="mt-4 space-y-2" aria-label="Social sign-in providers">
+            {SOCIAL_AUTH_PROVIDERS.map((provider) => (
               <button
+                key={provider.id}
                 type="button"
-                onClick={() => {
-                  setAuthRoute(authRoute === 'login' ? 'register' : 'login')
-                  setErrorMessage(null)
-                }}
-                className="font-medium text-slate-900 underline-offset-2 hover:underline"
+                disabled
+                className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-500"
               >
-                {authRoute === 'login' ? 'Register' : 'Login'}
+                {provider.label} (coming soon)
               </button>
-            </p>
-          </>
-        )}
-      </section>
+            ))}
+          </div>
+
+          <p className="mt-3 text-xs text-slate-500">
+            OAuth providers are planned. Use login name + password for this MVP.
+          </p>
+
+          <form
+            className="mt-6 space-y-4"
+            onSubmit={route.kind === 'login' ? handleLoginSubmit : handleRegisterSubmit}
+          >
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Login name</span>
+              <input
+                type="text"
+                name="loginName"
+                autoComplete="username"
+                value={loginName}
+                onChange={(event) => setLoginName(event.target.value)}
+                required
+                minLength={3}
+                maxLength={24}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Password</span>
+              <input
+                type="password"
+                name="password"
+                autoComplete={route.kind === 'login' ? 'current-password' : 'new-password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength={8}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+              />
+            </label>
+
+            {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+            >
+              {isSubmitting
+                ? route.kind === 'login'
+                  ? 'Logging in...'
+                  : 'Creating account...'
+                : route.kind === 'login'
+                  ? 'Login'
+                  : 'Create account'}
+            </button>
+          </form>
+
+          <p className="mt-4 text-sm text-slate-600">
+            {route.kind === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage(null)
+                navigate(route.kind === 'login' ? REGISTER_PATH : LOGIN_PATH)
+              }}
+              className="font-medium text-slate-900 underline-offset-2 hover:underline"
+            >
+              {route.kind === 'login' ? 'Register' : 'Login'}
+            </button>
+          </p>
+        </section>
+      ) : null}
     </main>
   )
 }

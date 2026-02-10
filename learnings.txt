@@ -57,3 +57,9 @@
 - Pitfall: Delete permissions need explicit moderator behavior; without an admin role in MVP, ownership override must be codified server-side.
 - Decision: Define moderation override as server owner can delete any message, while message authors can always delete their own.
 - Reuse: For future moderation features, compute UI capabilities (`canDelete`) in Convex view models so the client stays permission-thin and consistent.
+
+## 2026-02-10 - US-011
+- Worked: Parsing URL paths into an app route model let `/login`, `/register`, and `/app/servers/:serverId/channels/:channelId` stay in sync with Convex-backed selection state.
+- Pitfall: Route params can become stale when server/channel membership changes, so effects must normalize invalid params back to safe defaults.
+- Decision: Keep routing dependency-free by using browser history APIs, with auth guards and selection normalization handled in React effects.
+- Reuse: For future deep-linkable features, drive selected entities from URL params and navigate after create/join actions to preserve shareable state.
