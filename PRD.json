@@ -12,6 +12,10 @@
       "passes",
       "status"
     ],
+    "userStoryOptionalKeys": [
+      "dependsOn",
+      "assignee"
+    ],
     "userStoryStatusEnum": [
       "unstarted",
       "in-progress",
@@ -202,6 +206,149 @@
       "priority": 12,
       "passes": true,
       "status": "completed"
+    },
+    {
+      "id": "US-013",
+      "title": "Replace ESLint with Oxlint",
+      "description": "As a developer, I want Oxlint to be the primary style checker so linting is faster and simpler.",
+      "acceptanceCriteria": [
+        "Remove ESLint dependencies and configuration from the repo",
+        "Add Oxlint dependency and lint script using Bun",
+        "Lint command runs successfully on the TypeScript codebase",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "dependsOn": [],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-014",
+      "title": "Automate checks with GitHub Actions",
+      "description": "As a maintainer, I want CI automation so pull requests are validated automatically for quality gates.",
+      "acceptanceCriteria": [
+        "Create GitHub Actions workflow for pull_request and push",
+        "Workflow runs bun install, typecheck, lint, test, and build",
+        "Workflow fails when any required check fails",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "dependsOn": [
+        "US-013"
+      ],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-015",
+      "title": "Redesign app shell with dark theme",
+      "description": "As an authenticated user, I want a dark three-pane chat layout with an icon server rail so navigation feels modern and focused.",
+      "acceptanceCriteria": [
+        "App shell uses server icon rail, channel list, and message pane layout",
+        "UI theme is dark and readable across auth and app views",
+        "Layout remains usable on desktop and mobile",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "dependsOn": [],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-016",
+      "title": "Server-first channel routing behavior",
+      "description": "As a user, I want selecting a server to open the first available channel automatically so chat is immediately accessible.",
+      "acceptanceCriteria": [
+        "Selecting any server routes to that server's first channel when available",
+        "Invalid server or channel route params recover to a valid selection",
+        "Empty channel states are handled without broken navigation",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "dependsOn": [
+        "US-015"
+      ],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-017",
+      "title": "Friends and mutual request flow",
+      "description": "As a user, I want to send and accept friend requests so direct messaging is only available to confirmed friends.",
+      "acceptanceCriteria": [
+        "User can send friend request by login name",
+        "Recipient can accept or decline request",
+        "Duplicate, self, and invalid requests are rejected safely",
+        "Accepted friendships are queryable for UI",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "dependsOn": [],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-018",
+      "title": "Direct messages via Friends server",
+      "description": "As a user, I want a special Friends server where each friend appears as a DM channel.",
+      "acceptanceCriteria": [
+        "Friends entry appears first in server icon rail",
+        "Each accepted friend has a dedicated DM channel",
+        "Only friendship participants can read and send DM messages",
+        "DM list and messages update in realtime",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "dependsOn": [
+        "US-017"
+      ],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-019",
+      "title": "Settings page for management actions",
+      "description": "As a user, I want management actions moved into settings so chat screens stay focused on conversation.",
+      "acceptanceCriteria": [
+        "Add settings route in authenticated app",
+        "Move server and channel management controls into settings",
+        "Main chat view keeps only navigation and messaging interactions",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "dependsOn": [
+        "US-015"
+      ],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-020",
+      "title": "Regression coverage for new collaboration flows",
+      "description": "As a maintainer, I want stronger automated coverage for navigation, friends, and direct messaging so releases remain stable.",
+      "acceptanceCriteria": [
+        "Add tests for server selection, channel fallback, and DM access rules",
+        "Validation includes bun run typecheck, bun run lint, bun run test, and bun run build",
+        "Document any missing scripts or equivalents in PR notes",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "dependsOn": [
+        "US-014",
+        "US-016",
+        "US-018",
+        "US-019"
+      ],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
     }
   ]
 }
