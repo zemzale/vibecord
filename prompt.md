@@ -7,7 +7,8 @@ This workflow is mandatory for every coding session.
 - Source of truth: `PRD.json`
 - One active user story per worker/session
 - No work outside the selected user story unless required to satisfy its acceptance criteria
-- Sessions may run from a Git worktree instead of the primary clone; treat the current worktree as the active workspace.
+- Sessions may run from a Git worktree inside a bare repo. In such case create
+  new worktree for each story branch and place it in the current directory.
 
 ## Hard Rules
 
@@ -95,24 +96,25 @@ pwd
 
 ## Mandatory Session Procedure
 
-1. Read `PRD.json`.
-2. Select a ready active story using the deterministic selection logic above.
-3. Validate branch/worktree availability for the selected story.
-4. Ensure you are in the correct story branch for this worktree:
+1. From the `main` worktree, pull latest changes from `origin/main`.
+2. Only after pulling latest `main`, check out/read `PRD.json`.
+3. Select a ready active story using the deterministic selection logic above.
+4. Validate branch/worktree availability for the selected story.
+5. Ensure you are in the correct story branch for this worktree:
    - If the current branch already matches the story, keep it.
    - If working with worktrees, always create/use a new dedicated worktree path for the story branch.
    - If the story branch is already used by another worktree, treat that story as taken and re-run selection for the next eligible story.
    - Never switch branches inside an existing worktree path to start a different story.
-5. After step 4 succeeds, update that story `status` to `in-progress` and set `assignee`.
-6. Implement only what is needed for that story.
-7. Verify all acceptance criteria one by one.
-8. Run validation commands.
-9. Update `PRD.json`:
-   - `passes: true`
-   - `status: completed`
-   - clear `assignee`
-10. Append useful session insights to `learnings.txt`.
-11. Commit, push, and open/update PR.
+6. After step 5 succeeds, update that story `status` to `in-progress` and set `assignee`.
+7. Implement only what is needed for that story.
+8. Verify all acceptance criteria one by one.
+9. Run validation commands.
+10. Update `PRD.json`:
+    - `passes: true`
+    - `status: completed`
+    - clear `assignee`
+11. Append useful session insights to `learnings.txt`.
+12. Commit, push, and open/update PR.
 
 ## Required Validation Commands
 
