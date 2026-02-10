@@ -3,3 +3,9 @@
 - Pitfall: `bun create vite .` cancelled in a non-empty directory, so direct in-place scaffolding was unreliable.
 - Decision: Keep Convex connected at the frontend provider/client layer first, then initialize cloud deployment with `bunx convex dev` when credentials are available.
 - Reuse: For future stories, use Bun scripts (`typecheck`, `test`, `build`) as the stable validation baseline before feature-level checks.
+
+## 2026-02-10 - US-002
+- Worked: Using a Convex mutation for registration with PBKDF2 + per-user salt handled secure password storage and session creation in one server flow.
+- Pitfall: React tests failed after introducing Convex hooks until `App` was rendered under `ConvexProvider`.
+- Decision: Keep client calls typed with `makeFunctionReference` for now to avoid blocking on generated API files.
+- Reuse: For upcoming auth stories, persist only session tokens in local storage and resolve current user through a token-backed Convex query.
