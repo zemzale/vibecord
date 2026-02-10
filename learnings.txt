@@ -111,6 +111,11 @@
 - Pitfall: UI tests can leave multiple rendered instances in the DOM, so role/title queries should handle duplicates when asserting modal behavior.
 - Decision: Close on overlay click and Escape, while stopping propagation inside the dialog and restoring focus to the trigger.
 - Reuse: For future modal work, keep dismissal logic in one component-level state flow and add focused interaction tests for overlay vs content clicks.
+## 2026-02-10 - US-023
+- Worked: Using Tailwind `group-hover` and `group-focus-within` on each message row hid delete actions by default without changing message permissions.
+- Pitfall: Pure hover behavior breaks keyboard discoverability, so focus states must also reveal row actions.
+- Decision: Keep delete controls fully visible while deletion is pending so users keep clear feedback during mutation latency.
+- Reuse: For future action-density cleanup, prefer opacity-based reveal patterns that preserve existing handlers and authorization logic.
 
 ## 2026-02-10 - US-016
 - Worked: Route normalization effects in server and channel panels reliably redirected server-only paths to the first available channel once data loaded.
