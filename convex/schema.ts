@@ -40,4 +40,13 @@ export default defineSchema({
   })
     .index('by_user_id', ['userId'])
     .index('by_server_id_user_id', ['serverId', 'userId']),
+  channels: defineTable({
+    serverId: v.id('servers'),
+    name: v.string(),
+    nameLower: v.string(),
+    createdBy: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_server_id_created_at', ['serverId', 'createdAt'])
+    .index('by_server_id_name_lower', ['serverId', 'nameLower']),
 })
