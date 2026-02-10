@@ -12,16 +12,8 @@
       "passes",
       "status"
     ],
-    "userStoryOptionalKeys": [
-      "dependsOn",
-      "assignee"
-    ],
-    "userStoryStatusEnum": [
-      "unstarted",
-      "in-progress",
-      "blocked",
-      "completed"
-    ]
+    "userStoryOptionalKeys": ["dependsOn", "assignee"],
+    "userStoryStatusEnum": ["unstarted", "in-progress", "blocked", "completed"]
   },
   "userStories": [
     {
@@ -234,9 +226,7 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "dependsOn": [
-        "US-013"
-      ],
+      "dependsOn": ["US-013"],
       "assignee": null,
       "passes": false,
       "status": "unstarted"
@@ -268,9 +258,7 @@
         "Typecheck passes"
       ],
       "priority": 16,
-      "dependsOn": [
-        "US-015"
-      ],
+      "dependsOn": ["US-015"],
       "assignee": null,
       "passes": false,
       "status": "unstarted"
@@ -289,8 +277,8 @@
       "priority": 17,
       "dependsOn": [],
       "assignee": null,
-      "passes": false,
-      "status": "unstarted"
+      "passes": true,
+      "status": "completed"
     },
     {
       "id": "US-018",
@@ -304,9 +292,7 @@
         "Typecheck passes"
       ],
       "priority": 18,
-      "dependsOn": [
-        "US-017"
-      ],
+      "dependsOn": ["US-017"],
       "assignee": null,
       "passes": false,
       "status": "unstarted"
@@ -322,9 +308,7 @@
         "Typecheck passes"
       ],
       "priority": 19,
-      "dependsOn": [
-        "US-015"
-      ],
+      "dependsOn": ["US-015"],
       "assignee": null,
       "passes": false,
       "status": "unstarted"
@@ -340,12 +324,7 @@
         "Typecheck passes"
       ],
       "priority": 20,
-      "dependsOn": [
-        "US-014",
-        "US-016",
-        "US-018",
-        "US-019"
-      ],
+      "dependsOn": ["US-014", "US-016", "US-018", "US-019"],
       "assignee": null,
       "passes": false,
       "status": "unstarted"

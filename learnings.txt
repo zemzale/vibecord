@@ -69,3 +69,9 @@
 - Pitfall: Rate limiting in a serverless mutation context has no client IP, so keying on normalized login names is easy to bypass with rotating identifiers.
 - Decision: Use a per-action (`login`/`register`), fixed-window limiter in Convex with temporary lockouts and generic error copy to avoid account enumeration.
 - Reuse: Keep auth hardening centralized in `convex/auth.ts` and reuse helper-level guards in feature modules (`servers/channels/messages`) for baseline input and access validation.
+
+## 2026-02-10 - US-017
+- Worked: Adding dedicated `friendRequests` and `friendships` tables with pair-key lookups made duplicate prevention and accepted-friend queries deterministic.
+- Pitfall: Duplicate request checks must be bidirectional; only validating requester->recipient misses pending requests in the opposite direction.
+- Decision: Keep request response rights recipient-only and create friendships only on explicit accept to preserve a clear mutual request flow.
+- Reuse: For future DM routing, consume the `listFriends` query result directly so friend relationships remain server-authoritative and realtime.
