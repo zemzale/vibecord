@@ -14,6 +14,7 @@ This workflow is mandatory for every coding session.
 - Always pick the highest-priority ready unfinished story.
 - A story is ready only when all `dependsOn` stories have `passes === true`.
 - Multiple workers may run in parallel, but each worker may own only one active story at a time.
+- If a story branch is already mapped to any existing worktree path, treat that story as already taken by another worker and do not select it.
 - Keep all implementation in TypeScript.
 - Use Bun for package management and script execution.
 - Use Convex for all backend data and server-side logic.
@@ -46,11 +47,13 @@ Use this exact selection logic every session:
 3. Exclude stories where `status === "blocked"` unless explicitly instructed to unblock.
 4. Exclude stories where any `dependsOn` story has `passes !== true`.
 5. Exclude stories already assigned to a different worker when `assignee` is present.
-6. Sort remaining stories by:
+6. Exclude stories whose required branch is already mapped by `git worktree list`.
+7. Sort remaining stories by:
    - `priority` ascending,
    - then `id` ascending (lexicographic) as tie-breaker.
-7. Select index `0` from that sorted list as the active story.
-8. Immediately set selected story `status` to `in-progress` and set `assignee` to current worker/owner.
+8. Select index `0` from that sorted list as the candidate story.
+9. Validate branch/worktree availability for that candidate.
+10. Only after availability is confirmed, set selected story `status` to `in-progress` and set `assignee` to current worker/owner.
 
 If no selectable stories exist:
 
@@ -73,24 +76,43 @@ jq -r '.userStories
 - Story ID in branch name must match the active user story.
 - In worktree setups, each worktree should map to exactly one story branch.
 
+## Worktree Safety Guardrails
+
+- Never run `git checkout <story-branch>` in a workspace path that is not already mapped to that branch.
+- In worktree mode, always create/use a dedicated worktree path per story branch.
+- For a new story branch, always create a new worktree path first; do not repurpose the current path by branch switching.
+- Before any checkout/switch, run:
+
+```bash
+git worktree list
+git branch --show-current
+pwd
+```
+
+- If the target branch is already attached to a different worktree path, do not switch in the current directory.
+- In that case, treat that story as taken and select the next eligible story.
+- Do not attempt to "steal" a branch from another worktree or detach it implicitly.
+
 ## Mandatory Session Procedure
 
 1. Read `PRD.json`.
 2. Select a ready active story using the deterministic selection logic above.
-3. Immediately update that story `status` to `in-progress` and set `assignee`.
+3. Validate branch/worktree availability for the selected story.
 4. Ensure you are in the correct story branch for this worktree:
    - If the current branch already matches the story, keep it.
-   - If not in a worktree yet, create one for the story branch.
-   - If in a worktree but on the wrong branch, switch only if safe, or create a new worktree for the correct branch.
-5. Implement only what is needed for that story.
-6. Verify all acceptance criteria one by one.
-7. Run validation commands.
-8. Update `PRD.json`:
+   - If working with worktrees, always create/use a new dedicated worktree path for the story branch.
+   - If the story branch is already used by another worktree, treat that story as taken and re-run selection for the next eligible story.
+   - Never switch branches inside an existing worktree path to start a different story.
+5. After step 4 succeeds, update that story `status` to `in-progress` and set `assignee`.
+6. Implement only what is needed for that story.
+7. Verify all acceptance criteria one by one.
+8. Run validation commands.
+9. Update `PRD.json`:
    - `passes: true`
    - `status: completed`
    - clear `assignee`
-9. Append useful session insights to `learnings.txt`.
-10. Commit, push, and open/update PR.
+10. Append useful session insights to `learnings.txt`.
+11. Commit, push, and open/update PR.
 
 ## Required Validation Commands
 
