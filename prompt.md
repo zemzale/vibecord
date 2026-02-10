@@ -56,6 +56,7 @@ Use this exact selection logic every session:
 8. Select index `0` from that sorted list as the candidate story.
 9. Validate branch/worktree availability for that candidate.
 10. Only after availability is confirmed, set selected story `status` to `in-progress` and set `assignee` to current worker/owner.
+11. After a stroy has been selected push the change for main branch.
 
 If no selectable stories exist:
 

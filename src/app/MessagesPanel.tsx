@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values";
 import { useMutation, useQuery } from "convex/react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { listChannelsQuery } from "../lib/channels";
 import {
   deleteMessageMutation,
@@ -124,6 +124,15 @@ export function MessagesPanel({
     }
   }
 
+  function handleMessageInputKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  }
+
   return (
     <section
       aria-label="Messages"
@@ -171,15 +180,12 @@ export function MessagesPanel({
                 {messages.map((message) => (
                   <li
                     key={message.id}
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                    className="group rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
                           {message.authorLoginName}
-                        </p>
-                        <p className="shrink-0 text-[11px] text-slate-400">
-                          {new Date(message.createdAt).toLocaleString()}
                         </p>
                       </div>
                       {!isFriendsServerSelected && message.canDelete ? (
@@ -187,7 +193,11 @@ export function MessagesPanel({
                           type="button"
                           onClick={() => void handleDeleteMessage(message.id)}
                           disabled={deletingMessageId === message.id}
-                          className="inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          className={`inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 transition-opacity duration-150 disabled:cursor-not-allowed disabled:opacity-60 ${
+                            deletingMessageId === message.id
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                          }`}
                         >
                           {deletingMessageId === message.id
                             ? "Deleting..."
@@ -208,29 +218,46 @@ export function MessagesPanel({
             className="mt-3 border-t border-slate-800 bg-slate-950 pt-3"
             onSubmit={handleSendMessage}
           >
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                Message
-              </span>
-              <textarea
-                name="messageContent"
-                value={messageContent}
-                onChange={(event) => setMessageContent(event.target.value)}
-                required
-                minLength={1}
-                maxLength={2000}
-                rows={3}
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
-                placeholder="Write a message"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={isSendingMessage}
-              className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
-            >
-              {isSendingMessage ? "Sending..." : "Send message"}
-            </button>
+            <div className="flex items-end gap-2">
+              <label className="min-w-0 flex-1">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Message
+                </span>
+                <textarea
+                  name="messageContent"
+                  value={messageContent}
+                  onChange={(event) => setMessageContent(event.target.value)}
+                  onKeyDown={handleMessageInputKeyDown}
+                  required
+                  minLength={1}
+                  maxLength={2000}
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                  placeholder="Write a message"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={isSendingMessage}
+                aria-label={
+                  isSendingMessage ? "Sending message" : "Send message"
+                }
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-400 text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+              >
+                {isSendingMessage ? (
+                  <span className="text-xs font-semibold">...</span>
+                ) : (
+                  <svg
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                    className="h-5 w-5"
+                    fill="currentColor"
+                  >
+                    <path d="M3.41 2.89a.75.75 0 0 1 .82-.14l12.5 6a.75.75 0 0 1 0 1.35l-12.5 6A.75.75 0 0 1 3.15 15V11.5h5.35a.75.75 0 0 0 0-1.5H3.15V4a.75.75 0 0 1 .26-.57z" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </form>
         </>
       )}

@@ -111,3 +111,32 @@
 - Pitfall: Splitting authenticated routes into chat/settings sections required careful type narrowing to avoid passing settings routes into chat-only panels.
 - Decision: Keep chat panes focused on navigation and messaging only, while preserving all server/channel management capabilities inside `SettingsPage`.
 - Reuse: For future shell-level UX changes, model route sections explicitly (`chat` vs `settings`) so feature-specific panels stay type-safe and isolated.
+
+## 2026-02-10 - US-021
+- Worked: Converting server actions into a true overlay dialog made outside-click dismissal straightforward and predictable.
+- Pitfall: UI tests can leave multiple rendered instances in the DOM, so role/title queries should handle duplicates when asserting modal behavior.
+- Decision: Close on overlay click and Escape, while stopping propagation inside the dialog and restoring focus to the trigger.
+- Reuse: For future modal work, keep dismissal logic in one component-level state flow and add focused interaction tests for overlay vs content clicks.
+## 2026-02-10 - US-023
+- Worked: Using Tailwind `group-hover` and `group-focus-within` on each message row hid delete actions by default without changing message permissions.
+- Pitfall: Pure hover behavior breaks keyboard discoverability, so focus states must also reveal row actions.
+- Decision: Keep delete controls fully visible while deletion is pending so users keep clear feedback during mutation latency.
+- Reuse: For future action-density cleanup, prefer opacity-based reveal patterns that preserve existing handlers and authorization logic.
+
+## 2026-02-10 - US-016
+- Worked: Route normalization effects in server and channel panels reliably redirected server-only paths to the first available channel once data loaded.
+- Pitfall: Invalid URL params can look valid until queries resolve, so fallback navigation needs to wait for server/channel data before replacing history.
+- Decision: Keep server validity checks in the servers sidebar and channel validity checks in the channels panel to avoid mixed responsibilities.
+- Reuse: For future deep-link routes, pair every URL-driven selection with a "first valid fallback" effect to recover cleanly from stale links.
+
+## 2026-02-10 - US-024
+- Worked: Removing timestamp rendering in `MessagesPanel` kept the chat rows cleaner without touching message queries, ordering, or realtime subscriptions.
+- Pitfall: Message header layout depends on compact typography; removing metadata can leave awkward spacing if the author/delete row isn't preserved.
+- Decision: Keep the existing author label and delete control structure unchanged, only dropping the timestamp line from the UI.
+- Reuse: For low-risk chat UI cleanup stories, prefer targeted render-only edits over data-shape changes to avoid backend or realtime regressions.
+
+## 2026-02-10 - US-025
+- Worked: Moving the send control inline with the textarea and switching it to an icon-only button made the compose area feel faster without changing mutation wiring.
+- Pitfall: Keyboard submit can regress when switching to a compact composer; relying on textarea default Enter behavior won't submit forms consistently.
+- Decision: Submit on Enter and keep Shift+Enter for newline so both quick-send and multiline authoring remain available.
+- Reuse: For future message composer tweaks, keep form submission centralized and layer UI/keyboard ergonomics on top to avoid backend-impacting changes.
