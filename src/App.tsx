@@ -28,9 +28,12 @@ import {
   sendMessageMutation,
 } from "./lib/messages";
 import {
+  listDirectMessageChannelsQuery,
+  listDirectMessagesQuery,
   listFriendRequestsQuery,
   listFriendsQuery,
   respondToFriendRequestMutation,
+  sendDirectMessageMutation,
   sendFriendRequestMutation,
 } from "./lib/friends";
 
@@ -46,6 +49,7 @@ type AppRoute =
 const LOGIN_PATH = "/login";
 const REGISTER_PATH = "/register";
 const APP_PATH = "/app";
+const FRIENDS_SERVER_ID = "friends";
 
 function readInitialSessionToken(): string | null {
   if (typeof window === "undefined") {
@@ -191,10 +195,12 @@ function App() {
   const deleteServer = useMutation(deleteServerMutation);
   const sendFriendRequest = useMutation(sendFriendRequestMutation);
   const respondToFriendRequest = useMutation(respondToFriendRequestMutation);
+  const sendDirectMessage = useMutation(sendDirectMessageMutation);
 
   const route = useMemo(() => parseRoute(pathname), [pathname]);
   const selectedServerId = route.kind === "app" ? route.serverId : null;
   const selectedChannelId = route.kind === "app" ? route.channelId : null;
+  const isFriendsServerSelected = selectedServerId === FRIENDS_SERVER_ID;
 
   const sessionUser = useQuery(
     getSessionUserQuery,
@@ -208,24 +214,53 @@ function App() {
     listMyServersQuery,
     activeUser && sessionToken ? { sessionToken } : "skip",
   );
+  const directMessageChannels = useQuery(
+    listDirectMessageChannelsQuery,
+    activeUser && sessionToken ? { sessionToken } : "skip",
+  );
+  const appServers = useMemo(
+    () =>
+      activeUser
+        ? [
+            {
+              id: FRIENDS_SERVER_ID,
+              name: "Friends",
+              ownerId: activeUser.id,
+              createdAt: Number.MAX_SAFE_INTEGER,
+              membershipRole: "owner" as const,
+            },
+            ...(myServers ?? []),
+          ]
+        : [],
+    [activeUser, myServers],
+  );
   const selectedServer = useMemo(
-    () => myServers?.find((server) => server.id === selectedServerId) ?? null,
-    [myServers, selectedServerId],
+    () => appServers.find((server) => server.id === selectedServerId) ?? null,
+    [appServers, selectedServerId],
   );
   const channels = useQuery(
     listChannelsQuery,
-    activeUser && sessionToken && selectedServerId
+    activeUser && sessionToken && selectedServerId && !isFriendsServerSelected
       ? { sessionToken, serverId: selectedServerId }
       : "skip",
   );
-  const selectedChannel = useMemo(
+  const selectedDirectMessageChannel = useMemo(
+    () =>
+      directMessageChannels?.find(
+        (channel) => channel.id === selectedChannelId,
+      ) ?? null,
+    [directMessageChannels, selectedChannelId],
+  );
+  const selectedServerChannel = useMemo(
     () => channels?.find((channel) => channel.id === selectedChannelId) ?? null,
     [channels, selectedChannelId],
   );
   const messages = useQuery(
-    listMessagesQuery,
+    isFriendsServerSelected ? listDirectMessagesQuery : listMessagesQuery,
     activeUser && sessionToken && selectedChannelId
-      ? { sessionToken, channelId: selectedChannelId }
+      ? isFriendsServerSelected
+        ? { sessionToken, friendshipId: selectedChannelId }
+        : { sessionToken, channelId: selectedChannelId }
       : "skip",
   );
   const friendRequests = useQuery(
@@ -300,28 +335,51 @@ function App() {
       return;
     }
 
-    if (!myServers) {
-      return;
-    }
-
-    if (myServers.length === 0) {
-      if (route.serverId || route.channelId) {
-        navigate(APP_PATH, { replace: true });
-      }
+    if (!myServers || !directMessageChannels) {
       return;
     }
 
     const hasServerSelection = route.serverId
-      ? myServers.some((server) => server.id === route.serverId)
+      ? appServers.some((server) => server.id === route.serverId)
       : false;
     if (!hasServerSelection) {
-      navigate(createAppPath(myServers[0].id, null), { replace: true });
+      navigate(createAppPath(FRIENDS_SERVER_ID, null), { replace: true });
       return;
     }
-  }, [activeUser, myServers, route]);
+  }, [activeUser, appServers, directMessageChannels, myServers, route]);
 
   useEffect(() => {
     if (!activeUser || route.kind !== "app" || !route.serverId) {
+      return;
+    }
+
+    if (route.serverId === FRIENDS_SERVER_ID) {
+      if (!directMessageChannels) {
+        return;
+      }
+
+      if (directMessageChannels.length === 0) {
+        if (route.channelId) {
+          navigate(createAppPath(FRIENDS_SERVER_ID, null), { replace: true });
+        }
+        return;
+      }
+
+      const hasDirectMessageSelection = route.channelId
+        ? directMessageChannels.some(
+            (channel) => channel.id === route.channelId,
+          )
+        : false;
+
+      if (!hasDirectMessageSelection) {
+        navigate(
+          createAppPath(FRIENDS_SERVER_ID, directMessageChannels[0].id),
+          {
+            replace: true,
+          },
+        );
+      }
+
       return;
     }
 
@@ -345,7 +403,7 @@ function App() {
         replace: true,
       });
     }
-  }, [activeUser, channels, route]);
+  }, [activeUser, channels, directMessageChannels, route]);
 
   function persistSession(nextSessionToken: string) {
     setSessionToken(nextSessionToken);
@@ -607,11 +665,19 @@ function App() {
     setIsSendingMessage(true);
 
     try {
-      await sendMessage({
-        sessionToken,
-        channelId: selectedChannelId,
-        content: messageContent,
-      });
+      if (isFriendsServerSelected) {
+        await sendDirectMessage({
+          sessionToken,
+          friendshipId: selectedChannelId,
+          content: messageContent,
+        });
+      } else {
+        await sendMessage({
+          sessionToken,
+          channelId: selectedChannelId,
+          content: messageContent,
+        });
+      }
       setMessageContent("");
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === "string") {
@@ -1001,16 +1067,14 @@ function App() {
               <h2 className="text-sm font-semibold text-slate-700">
                 My servers
               </h2>
-              {myServers === undefined ? (
+              {myServers === undefined ||
+              directMessageChannels === undefined ? (
                 <p className="text-sm text-slate-500">Loading servers...</p>
-              ) : myServers.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                  No servers yet. Create your first server to get started.
-                </p>
               ) : (
                 <ul className="space-y-2">
-                  {myServers.map((server) => {
+                  {appServers.map((server) => {
                     const isSelected = selectedServerId === server.id;
+                    const isFriendsServer = server.id === FRIENDS_SERVER_ID;
 
                     return (
                       <li
@@ -1031,9 +1095,11 @@ function App() {
                               <p className="truncate font-medium">
                                 {server.name}
                               </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                ID: {server.id}
-                              </p>
+                              {!isFriendsServer ? (
+                                <p className="mt-1 text-xs text-slate-500">
+                                  ID: {server.id}
+                                </p>
+                              ) : null}
                               {isSelected ? (
                                 <p className="mt-1 text-xs text-slate-500">
                                   Selected server
@@ -1041,14 +1107,17 @@ function App() {
                               ) : null}
                             </div>
                             <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600">
-                              {server.membershipRole === "owner"
-                                ? "Owner"
-                                : "Member"}
+                              {isFriendsServer
+                                ? "DM"
+                                : server.membershipRole === "owner"
+                                  ? "Owner"
+                                  : "Member"}
                             </span>
                           </div>
                         </button>
 
-                        {server.membershipRole === "member" ? (
+                        {!isFriendsServer &&
+                        server.membershipRole === "member" ? (
                           <button
                             type="button"
                             onClick={() => void handleLeaveServer(server.id)}
@@ -1059,7 +1128,8 @@ function App() {
                               ? "Leaving..."
                               : "Leave server"}
                           </button>
-                        ) : server.membershipRole === "owner" ? (
+                        ) : !isFriendsServer &&
+                          server.membershipRole === "owner" ? (
                           <button
                             type="button"
                             onClick={() => void handleDeleteServer(server.id)}
@@ -1096,11 +1166,11 @@ function App() {
                   setMessageErrorMessage(null);
                   navigate(createAppPath(event.target.value || null, null));
                 }}
-                disabled={!myServers || myServers.length === 0}
+                disabled={!activeUser}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
               >
-                {myServers && myServers.length > 0 ? (
-                  myServers.map((server) => (
+                {appServers.length > 0 ? (
+                  appServers.map((server) => (
                     <option key={server.id} value={server.id}>
                       {server.name}
                     </option>
@@ -1124,19 +1194,25 @@ function App() {
                   required
                   minLength={1}
                   maxLength={64}
-                  disabled={!selectedServerId}
+                  disabled={!selectedServerId || isFriendsServerSelected}
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring disabled:cursor-not-allowed disabled:bg-slate-100"
                   placeholder={
-                    selectedServer
-                      ? `Create in ${selectedServer.name}`
-                      : "Select a server first"
+                    isFriendsServerSelected
+                      ? "Direct message channels are generated automatically"
+                      : selectedServer
+                        ? `Create in ${selectedServer.name}`
+                        : "Select a server first"
                   }
                 />
               </label>
 
               <button
                 type="submit"
-                disabled={isCreatingChannel || !selectedServerId}
+                disabled={
+                  isCreatingChannel ||
+                  !selectedServerId ||
+                  isFriendsServerSelected
+                }
                 className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:text-slate-500"
               >
                 {isCreatingChannel ? "Creating channel..." : "Create channel"}
@@ -1151,6 +1227,43 @@ function App() {
               <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
                 Select a server to view its channels.
               </p>
+            ) : isFriendsServerSelected ? (
+              directMessageChannels === undefined ? (
+                <p className="mt-3 text-sm text-slate-500">Loading DMs...</p>
+              ) : directMessageChannels.length === 0 ? (
+                <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                  Accept a friend request to start a DM channel.
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {directMessageChannels.map((channel) => (
+                    <li
+                      key={channel.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMessageErrorMessage(null);
+                          navigate(
+                            createAppPath(FRIENDS_SERVER_ID, channel.id),
+                          );
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p className="truncate font-medium">
+                          @ {channel.friendLoginName}
+                        </p>
+                        {selectedChannelId === channel.id ? (
+                          <p className="text-xs text-slate-500">
+                            Selected conversation
+                          </p>
+                        ) : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
             ) : channels === undefined ? (
               <p className="mt-3 text-sm text-slate-500">Loading channels...</p>
             ) : channels.length === 0 ? (
@@ -1209,14 +1322,21 @@ function App() {
               </p>
             ) : !selectedChannelId ? (
               <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                Select a channel to read and send messages.
+                {isFriendsServerSelected
+                  ? "Select a DM channel to read and send messages."
+                  : "Select a channel to read and send messages."}
               </p>
             ) : (
               <>
                 <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                  Chatting in{" "}
+                  {isFriendsServerSelected
+                    ? "Direct message with"
+                    : "Chatting in"}{" "}
                   <span className="font-semibold">
-                    # {selectedChannel?.name ?? "Unknown channel"}
+                    {isFriendsServerSelected
+                      ? (selectedDirectMessageChannel?.friendLoginName ??
+                        "Unknown friend")
+                      : `# ${selectedServerChannel?.name ?? "Unknown channel"}`}
                   </span>
                 </p>
 
@@ -1278,7 +1398,7 @@ function App() {
                               {new Date(message.createdAt).toLocaleString()}
                             </p>
                           </div>
-                          {message.canDelete ? (
+                          {!isFriendsServerSelected && message.canDelete ? (
                             <button
                               type="button"
                               onClick={() =>

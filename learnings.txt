@@ -81,3 +81,9 @@
 - Pitfall: Lockfile contents can hide stale ESLint transitive entries until `bun install` is rerun after dependency cleanup.
 - Decision: Remove `eslint.config.js` entirely and rely on Oxlint defaults for the current TypeScript/React surface.
 - Reuse: For future toolchain migrations, change scripts first, remove old config/deps in one pass, then validate with full project checks.
+
+## 2026-02-10 - US-018
+- Worked: Treating each accepted friendship as a DM channel ID avoided extra channel-sync complexity while still giving realtime channel and message updates.
+- Pitfall: Mixing server channels and DM channels in one component can break TypeScript narrowing; separate selected-channel derivations keep union types safe.
+- Decision: Add a dedicated Convex `directMessages` table and route DM read/write through friendship-participant checks for strict access control.
+- Reuse: Use a virtual `Friends` server entry in navigation to introduce special channel spaces without changing core server tables.

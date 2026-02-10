@@ -63,6 +63,12 @@ export default defineSchema({
     .index("by_pair_key", ["pairKey"])
     .index("by_user_a_id", ["userAId"])
     .index("by_user_b_id", ["userBId"]),
+  directMessages: defineTable({
+    friendshipId: v.id("friendships"),
+    authorId: v.id("users"),
+    content: v.string(),
+    createdAt: v.number(),
+  }).index("by_friendship_id_created_at", ["friendshipId", "createdAt"]),
   servers: defineTable({
     name: v.string(),
     ownerId: v.id("users"),

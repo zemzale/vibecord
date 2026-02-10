@@ -328,11 +328,58 @@ export const listFriends = query({
 
         return {
           id: friend._id,
+          friendshipId: friendships[index]._id,
           loginName: friend.loginName,
           since: friendships[index].createdAt,
         };
       })
       .filter((friend): friend is NonNullable<typeof friend> => friend !== null)
       .sort((left, right) => left.loginName.localeCompare(right.loginName));
+  },
+});
+
+export const listDirectMessageChannels = query({
+  args: {
+    sessionToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const actor = await getAuthenticatedUser(ctx, args.sessionToken);
+    const asUserA = await ctx.db
+      .query("friendships")
+      .withIndex("by_user_a_id", (q) => q.eq("userAId", actor.id))
+      .collect();
+    const asUserB = await ctx.db
+      .query("friendships")
+      .withIndex("by_user_b_id", (q) => q.eq("userBId", actor.id))
+      .collect();
+
+    const friendships = [...asUserA, ...asUserB];
+    const friendIds = friendships.map((friendship) =>
+      friendship.userAId === actor.id ? friendship.userBId : friendship.userAId,
+    );
+
+    const friendUsers = await Promise.all(
+      friendIds.map((friendId) => ctx.db.get(friendId)),
+    );
+
+    return friendUsers
+      .map((friend, index) => {
+        if (!friend) {
+          return null;
+        }
+
+        return {
+          id: friendships[index]._id,
+          friendId: friend._id,
+          friendLoginName: friend.loginName,
+          createdAt: friendships[index].createdAt,
+        };
+      })
+      .filter(
+        (channel): channel is NonNullable<typeof channel> => channel !== null,
+      )
+      .sort((left, right) =>
+        left.friendLoginName.localeCompare(right.friendLoginName),
+      );
   },
 });
