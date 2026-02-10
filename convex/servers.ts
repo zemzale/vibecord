@@ -138,6 +138,38 @@ export const leaveServer = mutation({
   },
 })
 
+export const deleteServer = mutation({
+  args: {
+    sessionToken: v.string(),
+    serverId: v.id('servers'),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthenticatedUser(ctx, args.sessionToken)
+    const server = await ctx.db.get(args.serverId)
+
+    if (!server) {
+      throw new ConvexError('Server not found.')
+    }
+
+    if (server.ownerId !== userId) {
+      throw new ConvexError('Only the server owner can delete this server.')
+    }
+
+    const memberships = await ctx.db
+      .query('serverMemberships')
+      .withIndex('by_server_id_user_id', (q) => q.eq('serverId', args.serverId))
+      .collect()
+
+    await Promise.all(memberships.map((membership) => ctx.db.delete(membership._id)))
+    await ctx.db.delete(args.serverId)
+
+    return {
+      ok: true,
+      serverId: args.serverId,
+    }
+  },
+})
+
 export const listMyServers = query({
   args: {
     sessionToken: v.string(),

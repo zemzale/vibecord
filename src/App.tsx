@@ -12,6 +12,7 @@ import {
 } from './lib/auth'
 import {
   createServerMutation,
+  deleteServerMutation,
   joinServerMutation,
   leaveServerMutation,
   listMyServersQuery,
@@ -39,9 +40,11 @@ function App() {
   const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(null)
   const [joinServerErrorMessage, setJoinServerErrorMessage] = useState<string | null>(null)
   const [leaveServerErrorMessage, setLeaveServerErrorMessage] = useState<string | null>(null)
+  const [deleteServerErrorMessage, setDeleteServerErrorMessage] = useState<string | null>(null)
   const [isCreatingServer, setIsCreatingServer] = useState(false)
   const [isJoiningServer, setIsJoiningServer] = useState(false)
   const [leavingServerId, setLeavingServerId] = useState<string | null>(null)
+  const [deletingServerId, setDeletingServerId] = useState<string | null>(null)
   const [sessionToken, setSessionToken] = useState<string | null>(readInitialSessionToken)
   const [freshUser, setFreshUser] = useState<SessionUser | null>(null)
 
@@ -51,6 +54,7 @@ function App() {
   const createServer = useMutation(createServerMutation)
   const joinServer = useMutation(joinServerMutation)
   const leaveServer = useMutation(leaveServerMutation)
+  const deleteServer = useMutation(deleteServerMutation)
   const sessionUser = useQuery(
     getSessionUserQuery,
     sessionToken ? { sessionToken } : 'skip',
@@ -189,6 +193,7 @@ function App() {
 
     setJoinServerErrorMessage(null)
     setLeaveServerErrorMessage(null)
+    setDeleteServerErrorMessage(null)
     setIsJoiningServer(true)
 
     try {
@@ -216,6 +221,7 @@ function App() {
 
     setLeaveServerErrorMessage(null)
     setJoinServerErrorMessage(null)
+    setDeleteServerErrorMessage(null)
     setLeavingServerId(serverId)
 
     try {
@@ -231,6 +237,33 @@ function App() {
       }
     } finally {
       setLeavingServerId(null)
+    }
+  }
+
+  async function handleDeleteServer(serverId: string) {
+    if (!sessionToken) {
+      setDeleteServerErrorMessage('You must be logged in to delete a server.')
+      return
+    }
+
+    setDeleteServerErrorMessage(null)
+    setLeaveServerErrorMessage(null)
+    setJoinServerErrorMessage(null)
+    setDeletingServerId(serverId)
+
+    try {
+      await deleteServer({
+        sessionToken,
+        serverId,
+      })
+    } catch (error) {
+      if (error instanceof ConvexError && typeof error.data === 'string') {
+        setDeleteServerErrorMessage(error.data)
+      } else {
+        setDeleteServerErrorMessage('Unable to delete this server right now. Please try again.')
+      }
+    } finally {
+      setDeletingServerId(null)
     }
   }
 
@@ -296,6 +329,7 @@ function App() {
             </form>
 
             {leaveServerErrorMessage ? <p className="text-sm text-red-600">{leaveServerErrorMessage}</p> : null}
+            {deleteServerErrorMessage ? <p className="text-sm text-red-600">{deleteServerErrorMessage}</p> : null}
 
             <section aria-label="My servers" className="space-y-2">
               <h2 className="text-sm font-semibold text-slate-700">My servers</h2>
@@ -329,6 +363,15 @@ function App() {
                           className="mt-2 inline-flex items-center rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
                         >
                           {leavingServerId === server.id ? 'Leaving...' : 'Leave server'}
+                        </button>
+                      ) : server.membershipRole === 'owner' ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteServer(server.id)}
+                          disabled={deletingServerId === server.id}
+                          className="mt-2 inline-flex items-center rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:cursor-not-allowed disabled:text-red-400"
+                        >
+                          {deletingServerId === server.id ? 'Deleting...' : 'Delete server'}
                         </button>
                       ) : null}
                     </li>

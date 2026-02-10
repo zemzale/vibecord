@@ -33,3 +33,9 @@
 - Pitfall: Free-text server IDs can fail Convex ID validation before business logic, so UI must surface safe join errors clearly.
 - Decision: Keep owner membership implicit (via `servers.ownerId`) and block owner leave operations to preserve ownership invariants.
 - Reuse: For upcoming channel/message permissions, enforce access with shared auth helpers and membership index lookups in Convex before any mutation logic.
+
+## 2026-02-10 - US-007
+- Worked: Adding a dedicated owner-only `deleteServer` mutation and wiring it to the owner row action kept server removal simple and realtime.
+- Pitfall: Related data cleanup can be missed; deleting `serverMemberships` before deleting the server avoids orphaned membership records.
+- Decision: Define this story's delete behavior as hard-delete for server + memberships (channels/messages are deferred until those tables exist).
+- Reuse: For future cascading deletes, implement cleanup in Convex mutations where authorization and relational teardown can be enforced together.
