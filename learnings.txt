@@ -9,3 +9,9 @@
 - Pitfall: React tests failed after introducing Convex hooks until `App` was rendered under `ConvexProvider`.
 - Decision: Keep client calls typed with `makeFunctionReference` for now to avoid blocking on generated API files.
 - Reuse: For upcoming auth stories, persist only session tokens in local storage and resolve current user through a token-backed Convex query.
+
+## 2026-02-10 - US-003
+- Worked: Adding shared Convex session helpers made register/login/logout flows consistent while keeping token storage client-only.
+- Pitfall: Session state can momentarily hydrate as unknown, so redirect logic must wait for `getSessionUser` to resolve before forcing logout.
+- Decision: Use one generic login failure message for missing users and bad passwords to avoid credential enumeration.
+- Reuse: Treat authenticated UI as a protected view backed by a token query; on token mismatch, clear local storage and send users back to login.

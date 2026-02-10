@@ -5,14 +5,16 @@ import App from './App'
 import { convexClient } from './lib/convex'
 
 describe('App', () => {
-  it('renders register form fields', () => {
+  it('renders login form by default', () => {
     render(
       <ConvexProvider client={convexClient}>
         <App />
       </ConvexProvider>,
     )
-    expect(screen.getByRole('heading', { name: 'Create your VibeCord account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'VibeCord' })).toBeInTheDocument()
+    expect(screen.getByText('Login to access your account.')).toBeInTheDocument()
     expect(screen.getByLabelText('Login name')).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
   })
 })
