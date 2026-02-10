@@ -106,6 +106,11 @@
 - Decision: Keep auth/session flow in `App.tsx` and move server/channel/message data and actions into dedicated panel components.
 - Reuse: For future UI stories, add focused components first, then migrate handlers and queries closest to each component to avoid regressions.
 
+## 2026-02-10 - US-021
+- Worked: Converting server actions into a true overlay dialog made outside-click dismissal straightforward and predictable.
+- Pitfall: UI tests can leave multiple rendered instances in the DOM, so role/title queries should handle duplicates when asserting modal behavior.
+- Decision: Close on overlay click and Escape, while stopping propagation inside the dialog and restoring focus to the trigger.
+- Reuse: For future modal work, keep dismissal logic in one component-level state flow and add focused interaction tests for overlay vs content clicks.
 ## 2026-02-10 - US-023
 - Worked: Using Tailwind `group-hover` and `group-focus-within` on each message row hid delete actions by default without changing message permissions.
 - Pitfall: Pure hover behavior breaks keyboard discoverability, so focus states must also reveal row actions.

@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import { useMutation } from "convex/react";
 import {
   useEffect,
+  useRef,
   useState,
   type Dispatch,
   type FormEvent,
@@ -39,6 +40,7 @@ export function ServersSidebar({
   const [isCreatingServer, setIsCreatingServer] = useState(false);
   const [isJoiningServer, setIsJoiningServer] = useState(false);
   const [isServerActionsOpen, setIsServerActionsOpen] = useState(false);
+  const serverActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const createServer = useMutation(createServerMutation);
   const joinServer = useMutation(joinServerMutation);
@@ -114,6 +116,31 @@ export function ServersSidebar({
     }
   }
 
+  useEffect(() => {
+    if (!isServerActionsOpen) {
+      return;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsServerActionsOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isServerActionsOpen]);
+
+  useEffect(() => {
+    if (isServerActionsOpen) {
+      return;
+    }
+
+    serverActionsTriggerRef.current?.focus();
+  }, [isServerActionsOpen]);
+
   return (
     <aside
       aria-label="Servers"
@@ -157,9 +184,12 @@ export function ServersSidebar({
 
           <li>
             <button
+              ref={serverActionsTriggerRef}
               type="button"
               onClick={() => setIsServerActionsOpen((current) => !current)}
               title="Create or join server"
+              aria-haspopup="dialog"
+              aria-expanded={isServerActionsOpen}
               className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-2xl leading-none text-cyan-100 transition hover:border-cyan-300 hover:bg-slate-800 lg:h-14 lg:w-14"
             >
               +
@@ -169,71 +199,82 @@ export function ServersSidebar({
       )}
 
       {isServerActionsOpen ? (
-        <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900 p-3 lg:absolute lg:left-full lg:top-3 lg:z-20 lg:mt-0 lg:ml-3 lg:w-72">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-            Server actions
-          </p>
-
-          <form className="mt-3 space-y-2" onSubmit={handleCreateServer}>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                Create server
-              </span>
-              <input
-                type="text"
-                name="serverName"
-                value={serverName}
-                onChange={(event) => setServerName(event.target.value)}
-                required
-                minLength={2}
-                maxLength={64}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
-                placeholder="Studio Lounge"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={isCreatingServer}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
-            >
-              {isCreatingServer ? "Creating server..." : "Create server"}
-            </button>
-          </form>
-
-          <form className="mt-4 space-y-2" onSubmit={handleJoinServer}>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                Join server by ID
-              </span>
-              <input
-                type="text"
-                name="joinServerId"
-                value={joinServerId}
-                onChange={(event) => setJoinServerId(event.target.value)}
-                required
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-300"
-                placeholder="Enter server ID"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={isJoiningServer}
-              className="inline-flex w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isJoiningServer ? "Joining server..." : "Join server"}
-            </button>
-          </form>
-
-          {globalServerError ? (
-            <p className="mt-3 text-sm text-rose-300">{globalServerError}</p>
-          ) : null}
-          {joinServerErrorMessage ? (
-            <p className="mt-2 text-sm text-rose-300">
-              {joinServerErrorMessage}
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/65 p-3"
+          onClick={() => setIsServerActionsOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Server actions"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-3"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+              Server actions
             </p>
-          ) : null}
+
+            <form className="mt-3 space-y-2" onSubmit={handleCreateServer}>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Create server
+                </span>
+                <input
+                  type="text"
+                  name="serverName"
+                  value={serverName}
+                  onChange={(event) => setServerName(event.target.value)}
+                  required
+                  minLength={2}
+                  maxLength={64}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                  placeholder="Studio Lounge"
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={isCreatingServer}
+                className="inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+              >
+                {isCreatingServer ? "Creating server..." : "Create server"}
+              </button>
+            </form>
+
+            <form className="mt-4 space-y-2" onSubmit={handleJoinServer}>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Join server by ID
+                </span>
+                <input
+                  type="text"
+                  name="joinServerId"
+                  value={joinServerId}
+                  onChange={(event) => setJoinServerId(event.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-300"
+                  placeholder="Enter server ID"
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={isJoiningServer}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isJoiningServer ? "Joining server..." : "Join server"}
+              </button>
+            </form>
+
+            {globalServerError ? (
+              <p className="mt-3 text-sm text-rose-300">{globalServerError}</p>
+            ) : null}
+            {joinServerErrorMessage ? (
+              <p className="mt-2 text-sm text-rose-300">
+                {joinServerErrorMessage}
+              </p>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </aside>
