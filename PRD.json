@@ -277,8 +277,8 @@
       "priority": 17,
       "dependsOn": [],
       "assignee": null,
-      "passes": false,
-      "status": "unstarted"
+      "passes": true,
+      "status": "completed"
     },
     {
       "id": "US-018",
