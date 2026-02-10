@@ -128,3 +128,9 @@
 - Pitfall: Message header layout depends on compact typography; removing metadata can leave awkward spacing if the author/delete row isn't preserved.
 - Decision: Keep the existing author label and delete control structure unchanged, only dropping the timestamp line from the UI.
 - Reuse: For low-risk chat UI cleanup stories, prefer targeted render-only edits over data-shape changes to avoid backend or realtime regressions.
+
+## 2026-02-10 - US-025
+- Worked: Moving the send control inline with the textarea and switching it to an icon-only button made the compose area feel faster without changing mutation wiring.
+- Pitfall: Keyboard submit can regress when switching to a compact composer; relying on textarea default Enter behavior won't submit forms consistently.
+- Decision: Submit on Enter and keep Shift+Enter for newline so both quick-send and multiline authoring remain available.
+- Reuse: For future message composer tweaks, keep form submission centralized and layer UI/keyboard ergonomics on top to avoid backend-impacting changes.
