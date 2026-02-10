@@ -105,3 +105,9 @@
 - Pitfall: Moving logic across files can leave stale imports and type references that only show up once full TypeScript validation runs.
 - Decision: Keep auth/session flow in `App.tsx` and move server/channel/message data and actions into dedicated panel components.
 - Reuse: For future UI stories, add focused components first, then migrate handlers and queries closest to each component to avoid regressions.
+
+## 2026-02-10 - US-016
+- Worked: Route normalization effects in server and channel panels reliably redirected server-only paths to the first available channel once data loaded.
+- Pitfall: Invalid URL params can look valid until queries resolve, so fallback navigation needs to wait for server/channel data before replacing history.
+- Decision: Keep server validity checks in the servers sidebar and channel validity checks in the channels panel to avoid mixed responsibilities.
+- Reuse: For future deep-link routes, pair every URL-driven selection with a "first valid fallback" effect to recover cleanly from stale links.
