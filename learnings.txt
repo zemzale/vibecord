@@ -21,3 +21,9 @@
 - Pitfall: Migrating toward provider-linked auth can break existing credential lookups unless login keeps a fallback path for legacy records.
 - Decision: Keep social buttons visibly disabled with clear "coming soon" copy so UI promises future OAuth without implying current support.
 - Reuse: For future OAuth providers, map provider identity into `authAccounts` first, then issue sessions through the same shared auth/session path.
+
+## 2026-02-10 - US-005
+- Worked: A token-gated Convex `createServer` mutation plus `listMyServers` query gave immediate realtime list updates after creation with minimal client state.
+- Pitfall: Hook order matters in React; dependent queries must be declared after derived auth state to avoid referencing values before initialization.
+- Decision: Scope "my servers" to owner-created servers for this story and defer membership-based listing to the join/leave story.
+- Reuse: For future protected features, centralize session-token validation in shared Convex helpers so every query/mutation enforces auth consistently.

@@ -10,6 +10,7 @@ import {
   SESSION_TOKEN_STORAGE_KEY,
   type SessionUser,
 } from './lib/auth'
+import { createServerMutation, listMyServersQuery } from './lib/servers'
 
 type AuthRoute = 'login' | 'register'
 
@@ -28,12 +29,16 @@ function App() {
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [serverName, setServerName] = useState('')
+  const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(null)
+  const [isCreatingServer, setIsCreatingServer] = useState(false)
   const [sessionToken, setSessionToken] = useState<string | null>(readInitialSessionToken)
   const [freshUser, setFreshUser] = useState<SessionUser | null>(null)
 
   const register = useMutation(registerMutation)
   const login = useMutation(loginMutation)
   const logout = useMutation(logoutMutation)
+  const createServer = useMutation(createServerMutation)
   const sessionUser = useQuery(
     getSessionUserQuery,
     sessionToken ? { sessionToken } : 'skip',
@@ -42,6 +47,10 @@ function App() {
   const activeUser = useMemo(
     () => (sessionUser === undefined ? freshUser : sessionUser),
     [freshUser, sessionUser],
+  )
+  const myServers = useQuery(
+    listMyServersQuery,
+    activeUser && sessionToken ? { sessionToken } : 'skip',
   )
 
   useEffect(() => {
@@ -130,6 +139,34 @@ function App() {
     clearLocalSession()
   }
 
+  async function handleCreateServer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!sessionToken) {
+      setServerErrorMessage('You must be logged in to create a server.')
+      return
+    }
+
+    setServerErrorMessage(null)
+    setIsCreatingServer(true)
+
+    try {
+      await createServer({
+        sessionToken,
+        name: serverName,
+      })
+      setServerName('')
+    } catch (error) {
+      if (error instanceof ConvexError && typeof error.data === 'string') {
+        setServerErrorMessage(error.data)
+      } else {
+        setServerErrorMessage('Unable to create server right now. Please try again.')
+      }
+    } finally {
+      setIsCreatingServer(false)
+    }
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-10 text-slate-900">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -140,6 +177,53 @@ function App() {
             <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
               Signed in as <span className="font-semibold">{activeUser.loginName}</span>
             </p>
+            <form className="space-y-3" onSubmit={handleCreateServer}>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">New server name</span>
+                <input
+                  type="text"
+                  name="serverName"
+                  value={serverName}
+                  onChange={(event) => setServerName(event.target.value)}
+                  required
+                  minLength={2}
+                  maxLength={64}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+                />
+              </label>
+
+              {serverErrorMessage ? <p className="text-sm text-red-600">{serverErrorMessage}</p> : null}
+
+              <button
+                type="submit"
+                disabled={isCreatingServer}
+                className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+              >
+                {isCreatingServer ? 'Creating server...' : 'Create server'}
+              </button>
+            </form>
+
+            <section aria-label="My servers" className="space-y-2">
+              <h2 className="text-sm font-semibold text-slate-700">My servers</h2>
+              {myServers === undefined ? (
+                <p className="text-sm text-slate-500">Loading servers...</p>
+              ) : myServers.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                  No servers yet. Create your first server to get started.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {myServers.map((server) => (
+                    <li
+                      key={server.id}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                    >
+                      {server.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
             <button
               type="button"
               onClick={handleLogout}
