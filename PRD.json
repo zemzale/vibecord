@@ -293,9 +293,9 @@
       ],
       "priority": 18,
       "dependsOn": ["US-017"],
-      "assignee": null,
+      "assignee": "azemzale",
       "passes": false,
-      "status": "unstarted"
+      "status": "in-progress"
     },
     {
       "id": "US-019",
