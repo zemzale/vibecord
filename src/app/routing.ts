@@ -9,6 +9,10 @@ export type AppRoute =
     }
   | {
       kind: "app";
+      section: "friends";
+    }
+  | {
+      kind: "app";
       section: "settings";
       serverId: string | null;
     };
@@ -16,6 +20,7 @@ export type AppRoute =
 export const LOGIN_PATH = "/login";
 export const REGISTER_PATH = "/register";
 export const APP_PATH = "/app";
+export const FRIENDS_PATH = `${APP_PATH}/friends`;
 export const SETTINGS_PATH = `${APP_PATH}/settings`;
 export const FRIENDS_SERVER_ID = "friends";
 
@@ -48,6 +53,10 @@ export function parseRoute(pathname: string): AppRoute {
 
   if (parts.length === 1) {
     return { kind: "app", section: "chat", serverId: null, channelId: null };
+  }
+
+  if (parts.length === 2 && parts[1] === "friends") {
+    return { kind: "app", section: "friends" };
   }
 
   if (parts.length === 2 && parts[1] === "settings") {
@@ -106,4 +115,8 @@ export function createSettingsPath(serverId: string | null = null): string {
   }
 
   return `${SETTINGS_PATH}/servers/${encodeURIComponent(serverId)}`;
+}
+
+export function createFriendsPath(): string {
+  return FRIENDS_PATH;
 }
