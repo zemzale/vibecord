@@ -1,7 +1,13 @@
 import type { SessionUser } from "../lib/auth";
-import { APP_PATH, createSettingsPath, type AppRoute } from "./routing";
+import {
+  APP_PATH,
+  createFriendsPath,
+  createSettingsPath,
+  type AppRoute,
+} from "./routing";
 import { AppHeader } from "./AppHeader";
 import { ChannelsPanel } from "./ChannelsPanel";
+import { FriendsPage } from "./FriendsPage";
 import { MessagesPanel } from "./MessagesPanel";
 import { SettingsPage } from "./SettingsPage";
 import { ServersSidebar } from "./ServersSidebar";
@@ -22,12 +28,14 @@ export function AppShell({
   onLogout,
 }: AppShellProps) {
   const isSettingsRoute = route.section === "settings";
+  const isFriendsRoute = route.section === "friends";
 
   return (
     <div className="flex min-h-screen w-full flex-col">
       <AppHeader
         loginName={activeUser.loginName}
-        isSettingsRoute={isSettingsRoute}
+        activeSection={route.section}
+        onOpenFriends={() => navigate(createFriendsPath())}
         onOpenSettings={() => navigate(createSettingsPath())}
         onOpenChat={() => navigate(APP_PATH)}
         onLogout={onLogout}
@@ -39,6 +47,12 @@ export function AppShell({
           sessionToken={sessionToken}
           route={route}
           navigate={navigate}
+        />
+      ) : isFriendsRoute ? (
+        <FriendsPage
+          activeUser={activeUser}
+          sessionToken={sessionToken}
+          route={route}
         />
       ) : (
         <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[5.5rem_20rem_minmax(0,1fr)]">
