@@ -140,3 +140,9 @@
 - Pitfall: Keyboard submit can regress when switching to a compact composer; relying on textarea default Enter behavior won't submit forms consistently.
 - Decision: Submit on Enter and keep Shift+Enter for newline so both quick-send and multiline authoring remain available.
 - Reuse: For future message composer tweaks, keep form submission centralized and layer UI/keyboard ergonomics on top to avoid backend-impacting changes.
+
+## 2026-02-11 - US-027
+- Worked: Adding a dedicated `/app/friends` route with a focused Friends page separated request-management workflows from DM chat routing cleanly.
+- Pitfall: App-level route unions can leak into chat-only panels unless the shell narrows by section before rendering each panel group.
+- Decision: Keep friend request validation and edge-case enforcement server-side in Convex, while surfacing Convex error messages directly in the Friends UI.
+- Reuse: For future feature hubs, pair a top-level route entry point with realtime query-driven sections (incoming, outgoing, accepted) to minimize client-side sync logic.
