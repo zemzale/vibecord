@@ -1,6 +1,12 @@
 import { ConvexError } from "convex/values";
 import { useMutation, useQuery } from "convex/react";
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { listChannelsQuery } from "../lib/channels";
 import {
   deleteMessageMutation,
@@ -34,6 +40,7 @@ export function MessagesPanel({
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
     null,
   );
+  const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const sendMessage = useMutation(sendMessageMutation);
   const sendDirectMessage = useMutation(sendDirectMessageMutation);
@@ -74,6 +81,13 @@ export function MessagesPanel({
       return;
     }
 
+    if (messageContent.trim().length === 0) {
+      setMessageErrorMessage(
+        "Message content must be between 1 and 2000 characters.",
+      );
+      return;
+    }
+
     setMessageErrorMessage(null);
     setIsSendingMessage(true);
 
@@ -92,6 +106,7 @@ export function MessagesPanel({
         });
       }
       setMessageContent("");
+      messageInputRef.current?.focus();
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === "string") {
         setMessageErrorMessage(error.data);
@@ -127,7 +142,19 @@ export function MessagesPanel({
   function handleMessageInputKeyDown(
     event: KeyboardEvent<HTMLTextAreaElement>,
   ) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+
+    if (event.ctrlKey) {
+      return;
+    }
+
+    if (!event.shiftKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       event.currentTarget.form?.requestSubmit();
     }
@@ -224,6 +251,7 @@ export function MessagesPanel({
                   Message
                 </span>
                 <textarea
+                  ref={messageInputRef}
                   name="messageContent"
                   value={messageContent}
                   onChange={(event) => setMessageContent(event.target.value)}
@@ -238,7 +266,9 @@ export function MessagesPanel({
               </label>
               <button
                 type="submit"
-                disabled={isSendingMessage}
+                disabled={
+                  isSendingMessage || messageContent.trim().length === 0
+                }
                 aria-label={
                   isSendingMessage ? "Sending message" : "Send message"
                 }

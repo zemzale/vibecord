@@ -141,6 +141,11 @@
 - Decision: Submit on Enter and keep Shift+Enter for newline so both quick-send and multiline authoring remain available.
 - Reuse: For future message composer tweaks, keep form submission centralized and layer UI/keyboard ergonomics on top to avoid backend-impacting changes.
 
+## 2026-02-11 - US-028
+- Worked: Routing both keyboard and button sends through the same form submit path kept validation and auth behavior aligned while adding richer key handling.
+- Pitfall: Enter key shortcuts can conflict with IME composition; without an `isComposing` guard, message send can trigger unexpectedly mid-composition.
+- Decision: Use plain Enter to submit, reserve Ctrl+Enter for newline insertion, and block whitespace-only sends client-side before mutation calls.
+- Reuse: For future composer UX stories, keep backend trim/length validation as the source of truth and add client-side guards only to prevent avoidable round trips.
 ## 2026-02-11 - US-027
 - Worked: Adding a dedicated `/app/friends` route with a focused Friends page separated request-management workflows from DM chat routing cleanly.
 - Pitfall: App-level route unions can leak into chat-only panels unless the shell narrows by section before rendering each panel group.
