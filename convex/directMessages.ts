@@ -5,7 +5,27 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+
+function selectMostRecentSession(
+  rows: Doc<"sessions">[],
+): Doc<"sessions"> | null {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows.reduce((latest, candidate) => {
+    if (candidate.expiresAt !== latest.expiresAt) {
+      return candidate.expiresAt > latest.expiresAt ? candidate : latest;
+    }
+
+    if (candidate.createdAt !== latest.createdAt) {
+      return candidate.createdAt > latest.createdAt ? candidate : latest;
+    }
+
+    return candidate._creationTime > latest._creationTime ? candidate : latest;
+  });
+}
 
 function isValidSessionToken(value: string): boolean {
   return value.length === 64 && /^[0-9a-f]+$/i.test(value);
@@ -31,10 +51,11 @@ async function getAuthenticatedUser(
 
   const tokenHash = await sha256Hex(sessionToken);
   const now = Date.now();
-  const session = await ctx.db
+  const sessions = await ctx.db
     .query("sessions")
     .withIndex("by_token_hash", (q) => q.eq("tokenHash", tokenHash))
-    .unique();
+    .collect();
+  const session = selectMostRecentSession(sessions);
 
   if (!session || session.expiresAt < now) {
     throw new ConvexError("You must be logged in to continue.");
