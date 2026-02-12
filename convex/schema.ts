@@ -98,4 +98,30 @@ export default defineSchema({
     content: v.string(),
     createdAt: v.number(),
   }).index("by_channel_id_created_at", ["channelId", "createdAt"]),
+  deletionOperations: defineTable({
+    target: v.union(v.literal("server"), v.literal("channel")),
+    requestedBy: v.id("users"),
+    serverId: v.optional(v.id("servers")),
+    channelId: v.optional(v.id("channels")),
+    status: v.union(v.literal("in_progress"), v.literal("completed")),
+    deletedMessages: v.number(),
+    deletedChannels: v.number(),
+    deletedMemberships: v.number(),
+    deletedServers: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_server_id_updated_at", ["serverId", "updatedAt"])
+    .index("by_channel_id_updated_at", ["channelId", "updatedAt"])
+    .index("by_server_id_status_updated_at", [
+      "serverId",
+      "status",
+      "updatedAt",
+    ])
+    .index("by_channel_id_status_updated_at", [
+      "channelId",
+      "status",
+      "updatedAt",
+    ]),
 });

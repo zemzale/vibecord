@@ -151,3 +151,9 @@
 - Pitfall: App-level route unions can leak into chat-only panels unless the shell narrows by section before rendering each panel group.
 - Decision: Keep friend request validation and edge-case enforcement server-side in Convex, while surfacing Convex error messages directly in the Friends UI.
 - Reuse: For future feature hubs, pair a top-level route entry point with realtime query-driven sections (incoming, outgoing, accepted) to minimize client-side sync logic.
+
+## 2026-02-12 - US-030
+- Worked: Converting server/channel deletion into scheduler-driven batched operations kept each mutation bounded while preserving realtime progress updates.
+- Pitfall: Immediate delete responses can hide long-running cleanup state, so UI needed explicit in-progress and completed messaging tied to backend operation status.
+- Decision: Persist deletion operation documents and advance cleanup in resumable internal mutations until all messages, channels, memberships, and server records are removed.
+- Reuse: For future large-data maintenance flows, expose operation status queries so user actions can report progress without blocking on one oversized mutation.

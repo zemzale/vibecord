@@ -1,14 +1,16 @@
 import { ConvexError } from "convex/values";
 import { useMutation, useQuery } from "convex/react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   createChannelMutation,
   deleteChannelMutation,
+  getChannelDeletionStatusQuery,
   listChannelsQuery,
 } from "../lib/channels";
 import {
   createServerMutation,
   deleteServerMutation,
+  getServerDeletionStatusQuery,
   joinServerMutation,
   leaveServerMutation,
 } from "../lib/servers";
@@ -45,6 +47,13 @@ export function SettingsPage({
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(
     null,
   );
+  const [activeServerDeletionId, setActiveServerDeletionId] = useState<
+    string | null
+  >(null);
+  const [activeChannelDeletionId, setActiveChannelDeletionId] = useState<
+    string | null
+  >(null);
+  const [operationMessage, setOperationMessage] = useState<string | null>(null);
 
   const createServer = useMutation(createServerMutation);
   const joinServer = useMutation(joinServerMutation);
@@ -84,6 +93,55 @@ export function SettingsPage({
     listChannelsQuery,
     selectedServerId ? { sessionToken, serverId: selectedServerId } : "skip",
   );
+  const serverDeletionStatus = useQuery(
+    getServerDeletionStatusQuery,
+    activeServerDeletionId
+      ? { sessionToken, serverId: activeServerDeletionId }
+      : "skip",
+  );
+  const channelDeletionStatus = useQuery(
+    getChannelDeletionStatusQuery,
+    activeChannelDeletionId
+      ? { sessionToken, channelId: activeChannelDeletionId }
+      : "skip",
+  );
+
+  useEffect(() => {
+    if (!activeServerDeletionId || !serverDeletionStatus) {
+      return;
+    }
+
+    if (serverDeletionStatus.status === "completed") {
+      setOperationMessage(
+        `Server delete completed. Removed ${serverDeletionStatus.deletedChannels} channels, ${serverDeletionStatus.deletedMessages} messages, and ${serverDeletionStatus.deletedMemberships} memberships.`,
+      );
+      setActiveServerDeletionId(null);
+      navigate(createSettingsPath(null), { replace: true });
+      return;
+    }
+
+    setOperationMessage(
+      `Deleting server... ${serverDeletionStatus.deletedChannels} channels, ${serverDeletionStatus.deletedMessages} messages, and ${serverDeletionStatus.deletedMemberships} memberships removed so far.`,
+    );
+  }, [activeServerDeletionId, navigate, serverDeletionStatus]);
+
+  useEffect(() => {
+    if (!activeChannelDeletionId || !channelDeletionStatus) {
+      return;
+    }
+
+    if (channelDeletionStatus.status === "completed") {
+      setOperationMessage(
+        `Channel delete completed. Removed ${channelDeletionStatus.deletedMessages} messages.`,
+      );
+      setActiveChannelDeletionId(null);
+      return;
+    }
+
+    setOperationMessage(
+      `Deleting channel... ${channelDeletionStatus.deletedMessages} messages removed so far.`,
+    );
+  }, [activeChannelDeletionId, channelDeletionStatus]);
 
   async function handleCreateServer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -168,10 +226,20 @@ export function SettingsPage({
 
   async function handleDeleteChannel(channelId: string) {
     setFormErrorMessage(null);
+    setOperationMessage(null);
     setDeletingChannelId(channelId);
 
     try {
-      await deleteChannel({ sessionToken, channelId });
+      const result = await deleteChannel({ sessionToken, channelId });
+      if (result.status === "completed") {
+        setOperationMessage(
+          `Channel delete completed. Removed ${result.deletedMessages} messages.`,
+        );
+        setActiveChannelDeletionId(null);
+      } else {
+        setOperationMessage("Channel deletion started.");
+        setActiveChannelDeletionId(channelId);
+      }
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === "string") {
         setFormErrorMessage(error.data);
@@ -187,6 +255,7 @@ export function SettingsPage({
 
   async function handleLeaveServer(serverId: string) {
     setFormErrorMessage(null);
+    setOperationMessage(null);
     setLeavingServerId(serverId);
 
     try {
@@ -207,11 +276,21 @@ export function SettingsPage({
 
   async function handleDeleteServer(serverId: string) {
     setFormErrorMessage(null);
+    setOperationMessage(null);
     setDeletingServerId(serverId);
 
     try {
-      await deleteServer({ sessionToken, serverId });
-      navigate(createSettingsPath(null));
+      const result = await deleteServer({ sessionToken, serverId });
+      if (result.status === "completed") {
+        setOperationMessage(
+          `Server delete completed. Removed ${result.deletedChannels} channels, ${result.deletedMessages} messages, and ${result.deletedMemberships} memberships.`,
+        );
+        setActiveServerDeletionId(null);
+        navigate(createSettingsPath(null), { replace: true });
+      } else {
+        setOperationMessage("Server deletion started.");
+        setActiveServerDeletionId(serverId);
+      }
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === "string") {
         setFormErrorMessage(error.data);
@@ -343,12 +422,17 @@ export function SettingsPage({
               <button
                 type="button"
                 onClick={() => void handleDeleteServer(selectedServer.id)}
-                disabled={deletingServerId === selectedServer.id}
+                disabled={
+                  deletingServerId === selectedServer.id ||
+                  activeServerDeletionId === selectedServer.id
+                }
                 className="mt-2 inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deletingServerId === selectedServer.id
                   ? "Deleting..."
-                  : "Delete server"}
+                  : activeServerDeletionId === selectedServer.id
+                    ? "Delete in progress..."
+                    : "Delete server"}
               </button>
             )}
           </div>
@@ -404,12 +488,17 @@ export function SettingsPage({
                   <button
                     type="button"
                     onClick={() => void handleDeleteChannel(channel.id)}
-                    disabled={deletingChannelId === channel.id}
+                    disabled={
+                      deletingChannelId === channel.id ||
+                      activeChannelDeletionId === channel.id
+                    }
                     className="inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {deletingChannelId === channel.id
                       ? "Deleting..."
-                      : "Delete"}
+                      : activeChannelDeletionId === channel.id
+                        ? "Delete in progress..."
+                        : "Delete"}
                   </button>
                 ) : null}
               </li>
@@ -419,6 +508,10 @@ export function SettingsPage({
 
         {formErrorMessage ? (
           <p className="mt-3 text-sm text-rose-300">{formErrorMessage}</p>
+        ) : null}
+
+        {operationMessage ? (
+          <p className="mt-3 text-sm text-cyan-200">{operationMessage}</p>
         ) : null}
       </div>
     </section>
