@@ -464,6 +464,267 @@
       "assignee": null,
       "passes": false,
       "status": "unstarted"
+    },
+    {
+      "id": "US-029",
+      "title": "Make write paths idempotent under concurrency",
+      "description": "As a maintainer, I want auth, friendship, membership, and channel creation flows to be safe under concurrent requests so duplicate records cannot break core features.",
+      "acceptanceCriteria": [
+        "Replace fragile check-then-insert patterns with idempotent upsert/reconcile flows for auth rate limits, friendships, server memberships, and server channel names",
+        "All reads that currently use .unique() on non-unique indexes are hardened to tolerate and repair duplicate rows",
+        "Existing duplicate records are handled safely during normal operation without requiring manual DB edits",
+        "Concurrent request simulation confirms no duplicate rows are created for protected pair keys",
+        "Typecheck passes"
+      ],
+      "priority": 29,
+      "dependsOn": ["US-012", "US-017"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-030",
+      "title": "Batch cascading deletes for servers and channels",
+      "description": "As a server owner, I want deletes to complete reliably at scale so large servers/channels do not fail midway due to mutation limits.",
+      "acceptanceCriteria": [
+        "Refactor server and channel delete flows to chunk message and membership cleanup in bounded batches",
+        "Deletion orchestration supports resumable or scheduled continuation until all related records are removed",
+        "User-facing delete action returns clear progress/success behavior for large datasets",
+        "Large fixture validation confirms delete operations complete without exceeding Convex function limits",
+        "Typecheck passes"
+      ],
+      "priority": 30,
+      "dependsOn": ["US-007", "US-008"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-031",
+      "title": "Paginate message history and optimize author hydration",
+      "description": "As a user, I want message lists to stay fast in busy channels and DMs so scrolling and loading remain responsive.",
+      "acceptanceCriteria": [
+        "Channel and DM message queries support cursor-based pagination with configurable page size",
+        "Frontend loads message history incrementally instead of collecting full history in one request",
+        "Author lookup avoids N+1 fetch behavior via batched hydration or denormalized author display data",
+        "Performance checks show stable query latency as message volume grows",
+        "Typecheck passes"
+      ],
+      "priority": 31,
+      "dependsOn": ["US-009", "US-018"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-032",
+      "title": "Align direct message delete contract",
+      "description": "As a user, I want DM delete behavior to match the API contract so permissions and UI actions are consistent and predictable.",
+      "acceptanceCriteria": [
+        "Either implement direct message delete mutation with permission enforcement or remove canDelete from DM API/types until supported",
+        "Messages panel behavior for DMs is consistent with backend response fields",
+        "No dead or misleading contract fields remain in shared frontend types",
+        "Typecheck passes"
+      ],
+      "priority": 32,
+      "dependsOn": ["US-018", "US-023"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-033",
+      "title": "Add regression tests for integrity and scale safeguards",
+      "description": "As a maintainer, I want automated coverage for concurrency and large-data paths so these reliability fixes do not regress.",
+      "acceptanceCriteria": [
+        "Add tests for concurrent friendship/membership/channel/auth flows that assert idempotent outcomes",
+        "Add tests for paginated channel and DM message queries including boundary cursors",
+        "Add tests for batched server/channel deletion behavior across multiple batches",
+        "Validation includes bun run typecheck, bun run lint, bun run test, and bun run build",
+        "Typecheck passes"
+      ],
+      "priority": 33,
+      "dependsOn": ["US-029", "US-030", "US-031", "US-032"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-034",
+      "title": "Harden auth rate-limit and auth-account dedupe",
+      "description": "As a maintainer, I want auth records to self-heal duplicate rows so login/register cannot fail under concurrent traffic.",
+      "acceptanceCriteria": [
+        "Refactor auth rate-limit reads/writes to avoid unsafe .unique() assumptions on non-unique indexes",
+        "Refactor auth account linking/lookup to reconcile duplicate provider records deterministically",
+        "Auth flow behavior remains consistent for login, register, and logout paths after dedupe handling",
+        "Typecheck passes"
+      ],
+      "priority": 34,
+      "dependsOn": ["US-029"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-035",
+      "title": "Make friendship and request flows idempotent",
+      "description": "As a user, I want friend request acceptance to be race-safe so duplicate friendships and pending records are not created.",
+      "acceptanceCriteria": [
+        "Friendship existence checks avoid .unique() failure mode on non-unique index data",
+        "Accept and send request paths are idempotent under concurrent requests",
+        "Duplicate friendship or pending request rows are reconciled safely during normal operations",
+        "Typecheck passes"
+      ],
+      "priority": 35,
+      "dependsOn": ["US-029", "US-017"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-036",
+      "title": "Make membership and channel create flows idempotent",
+      "description": "As a user, I want join/create actions to behave consistently even when requests are retried or sent concurrently.",
+      "acceptanceCriteria": [
+        "Join server flow prevents duplicate memberships under concurrent or retried requests",
+        "Create channel flow prevents duplicate channel names under concurrent requests",
+        "Existing duplicate rows are tolerated and reconciled without crashing reads",
+        "Typecheck passes"
+      ],
+      "priority": 36,
+      "dependsOn": ["US-029", "US-006", "US-008"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-037",
+      "title": "Implement batched channel deletion worker",
+      "description": "As a server member with delete permission, I want channel deletion to process messages in chunks so large channels delete reliably.",
+      "acceptanceCriteria": [
+        "Channel delete schedules or loops through bounded message-delete batches",
+        "Flow is resumable and idempotent if execution is retried",
+        "Final channel removal occurs only after message cleanup is complete",
+        "Typecheck passes"
+      ],
+      "priority": 37,
+      "dependsOn": ["US-030", "US-008"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-038",
+      "title": "Implement batched server deletion orchestrator",
+      "description": "As a server owner, I want server deletion to complete across channels/memberships/messages without hitting mutation limits.",
+      "acceptanceCriteria": [
+        "Server delete orchestrates channel, membership, and message cleanup in bounded steps",
+        "Flow is resumable and idempotent if any step is retried",
+        "Server document is deleted only after child resources are fully cleaned",
+        "Typecheck passes"
+      ],
+      "priority": 38,
+      "dependsOn": ["US-030", "US-007", "US-037"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-039",
+      "title": "Add channel message pagination contract",
+      "description": "As a user, I want channel history to load in pages so large channels remain responsive.",
+      "acceptanceCriteria": [
+        "Channel message query accepts pagination arguments and returns cursor/page metadata",
+        "Ordering is stable and deterministic across page boundaries",
+        "Existing message access and delete permissions remain unchanged",
+        "Typecheck passes"
+      ],
+      "priority": 39,
+      "dependsOn": ["US-031", "US-009"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-040",
+      "title": "Add direct message pagination contract",
+      "description": "As a user, I want direct message history to load in pages so long conversations stay fast.",
+      "acceptanceCriteria": [
+        "Direct message query accepts pagination arguments and returns cursor/page metadata",
+        "Ordering is stable and deterministic across page boundaries",
+        "Friendship participant access checks remain enforced for every page fetch",
+        "Typecheck passes"
+      ],
+      "priority": 40,
+      "dependsOn": ["US-031", "US-018"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-041",
+      "title": "Optimize author hydration in message queries",
+      "description": "As a maintainer, I want message list queries to avoid per-message user fetches so read performance scales with conversation size.",
+      "acceptanceCriteria": [
+        "Channel and DM message responses avoid N+1 author lookups",
+        "Implementation uses batched user hydration or denormalized author display data",
+        "Fallback behavior for deleted users remains safe and predictable",
+        "Typecheck passes"
+      ],
+      "priority": 41,
+      "dependsOn": ["US-031", "US-039", "US-040"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-042",
+      "title": "Update MessagesPanel for incremental history loading",
+      "description": "As a user, I want the chat UI to fetch older history progressively so large chats do not block rendering.",
+      "acceptanceCriteria": [
+        "Messages panel consumes paginated channel and DM query shapes",
+        "UI supports initial page render and explicit or automatic load-more behavior",
+        "State transitions handle loading, empty, and error cases without regressions",
+        "Typecheck passes"
+      ],
+      "priority": 42,
+      "dependsOn": ["US-039", "US-040"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-043",
+      "title": "Implement direct message deletion end-to-end",
+      "description": "As a user, I want to delete my own direct messages with the same clarity as channel message actions.",
+      "acceptanceCriteria": [
+        "Add backend DM delete mutation with author-only permission checks",
+        "Expose DM delete mutation and types in shared frontend contract",
+        "Messages panel enables DM delete action when canDelete is true",
+        "Typecheck passes"
+      ],
+      "priority": 43,
+      "dependsOn": ["US-032", "US-018", "US-023"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
+    },
+    {
+      "id": "US-044",
+      "title": "Add targeted regression suite for reliability backlog",
+      "description": "As a maintainer, I want focused tests for dedupe, batching, pagination, and DM delete so reliability fixes stay protected.",
+      "acceptanceCriteria": [
+        "Add concurrency tests for auth/friends/membership/channel idempotency behavior",
+        "Add batch-delete tests for channel and server cleanup orchestration",
+        "Add pagination and DM delete tests covering permission and cursor boundaries",
+        "Validation includes bun run typecheck, bun run lint, bun run test, and bun run build",
+        "Typecheck passes"
+      ],
+      "priority": 44,
+      "dependsOn": ["US-034", "US-035", "US-036", "US-037", "US-038", "US-041", "US-042", "US-043"],
+      "assignee": null,
+      "passes": false,
+      "status": "unstarted"
     }
   ]
 }
