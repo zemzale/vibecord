@@ -151,3 +151,9 @@
 - Pitfall: App-level route unions can leak into chat-only panels unless the shell narrows by section before rendering each panel group.
 - Decision: Keep friend request validation and edge-case enforcement server-side in Convex, while surfacing Convex error messages directly in the Friends UI.
 - Reuse: For future feature hubs, pair a top-level route entry point with realtime query-driven sections (incoming, outgoing, accepted) to minimize client-side sync logic.
+
+## 2026-02-12 - US-029
+- Worked: Replacing index `.unique()` reads with deterministic `collect()` + canonical-row selection removed runtime crashes while allowing duplicate cleanup in write paths.
+- Pitfall: Retry or concurrent writes can still race after check-then-insert flows, so mutation handlers must reconcile duplicate rows immediately after detecting an existing record set.
+- Decision: Treat membership/channel/friendship writes as idempotent by returning canonical existing rows and deleting duplicates in the same mutation when possible.
+- Reuse: For non-unique Convex indexes, always read many, pick a deterministic primary row, and opportunistically prune duplicates in mutations to self-heal data over time.

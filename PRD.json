@@ -479,8 +479,8 @@
       "priority": 29,
       "dependsOn": ["US-012", "US-017"],
       "assignee": null,
-      "passes": false,
-      "status": "unstarted"
+      "passes": true,
+      "status": "completed"
     },
     {
       "id": "US-030",
@@ -721,7 +721,16 @@
         "Typecheck passes"
       ],
       "priority": 44,
-      "dependsOn": ["US-034", "US-035", "US-036", "US-037", "US-038", "US-041", "US-042", "US-043"],
+      "dependsOn": [
+        "US-034",
+        "US-035",
+        "US-036",
+        "US-037",
+        "US-038",
+        "US-041",
+        "US-042",
+        "US-043"
+      ],
       "assignee": null,
       "passes": false,
       "status": "unstarted"

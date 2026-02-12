@@ -5,9 +5,77 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 type FriendRequestStatus = "pending" | "accepted" | "declined";
+
+function selectMostRecentSession(
+  rows: Doc<"sessions">[],
+): Doc<"sessions"> | null {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows.reduce((latest, candidate) => {
+    if (candidate.expiresAt !== latest.expiresAt) {
+      return candidate.expiresAt > latest.expiresAt ? candidate : latest;
+    }
+
+    if (candidate.createdAt !== latest.createdAt) {
+      return candidate.createdAt > latest.createdAt ? candidate : latest;
+    }
+
+    return candidate._creationTime > latest._creationTime ? candidate : latest;
+  });
+}
+
+function selectMostRecentUser(rows: Doc<"users">[]): Doc<"users"> | null {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows.reduce((latest, candidate) => {
+    if (candidate.createdAt !== latest.createdAt) {
+      return candidate.createdAt > latest.createdAt ? candidate : latest;
+    }
+
+    return candidate._creationTime > latest._creationTime ? candidate : latest;
+  });
+}
+
+async function upsertFriendship(
+  ctx: MutationCtx,
+  requesterId: Id<"users">,
+  recipientId: Id<"users">,
+  createdAt: number,
+): Promise<void> {
+  const pairKey = pairKeyForUsers(requesterId, recipientId);
+  const existingRows = await ctx.db
+    .query("friendships")
+    .withIndex("by_pair_key", (q) => q.eq("pairKey", pairKey))
+    .collect();
+
+  if (existingRows.length === 0) {
+    await ctx.db.insert("friendships", {
+      userAId: requesterId,
+      userBId: recipientId,
+      pairKey,
+      createdAt,
+    });
+    return;
+  }
+
+  const canonical = existingRows.reduce((earliest, candidate) =>
+    candidate.createdAt < earliest.createdAt ? candidate : earliest,
+  );
+  const duplicateIds = existingRows
+    .filter((row) => row._id !== canonical._id)
+    .map((row) => row._id);
+
+  for (const duplicateId of duplicateIds) {
+    await ctx.db.delete(duplicateId);
+  }
+}
 
 function isValidSessionToken(value: string): boolean {
   return value.length === 64 && /^[0-9a-f]+$/i.test(value);
@@ -33,10 +101,11 @@ async function getAuthenticatedUser(
 
   const tokenHash = await sha256Hex(sessionToken);
   const now = Date.now();
-  const session = await ctx.db
+  const sessions = await ctx.db
     .query("sessions")
     .withIndex("by_token_hash", (q) => q.eq("tokenHash", tokenHash))
-    .unique();
+    .collect();
+  const session = selectMostRecentSession(sessions);
 
   if (!session || session.expiresAt < now) {
     throw new ConvexError("You must be logged in to continue.");
@@ -64,12 +133,12 @@ async function ensureNoExistingFriendship(
   recipientId: Id<"users">,
 ): Promise<void> {
   const pairKey = pairKeyForUsers(requesterId, recipientId);
-  const friendship = await ctx.db
+  const friendships = await ctx.db
     .query("friendships")
     .withIndex("by_pair_key", (q) => q.eq("pairKey", pairKey))
-    .unique();
+    .collect();
 
-  if (friendship) {
+  if (friendships.length > 0) {
     throw new ConvexError("You are already friends with this user.");
   }
 }
@@ -127,12 +196,13 @@ export const sendFriendRequest = mutation({
       );
     }
 
-    const recipient = await ctx.db
+    const recipientRows = await ctx.db
       .query("users")
       .withIndex("by_login_name_lower", (q) =>
         q.eq("loginNameLower", normalized),
       )
-      .unique();
+      .collect();
+    const recipient = selectMostRecentUser(recipientRows);
 
     if (!recipient) {
       throw new ConvexError("User not found.");
@@ -202,17 +272,12 @@ export const respondToFriendRequest = mutation({
     const respondedAt = Date.now();
 
     if (nextStatus === "accepted") {
-      await ensureNoExistingFriendship(
+      await upsertFriendship(
         ctx,
         request.requesterId,
         request.recipientId,
+        respondedAt,
       );
-      await ctx.db.insert("friendships", {
-        userAId: request.requesterId,
-        userBId: request.recipientId,
-        pairKey: pairKeyForUsers(request.requesterId, request.recipientId),
-        createdAt: respondedAt,
-      });
     }
 
     await ctx.db.patch(request._id, {
